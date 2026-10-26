@@ -1,0 +1,69 @@
+model
+  schema 1.1
+
+type user
+
+type role
+  relations
+    define member: [user]
+
+type org
+  relations
+    define super_admin: [user]
+    define hr_admin: [user] or super_admin
+    define member: [user]
+
+type department
+  relations
+    define org: [org]
+    define parent: [department]
+    define head: [user] or head from parent
+    define member: [user]
+
+type location
+  relations
+    define org: [org]
+    define head: [user]
+    define member: [user]
+    define can_manage: head or hr_admin from org
+
+type employee
+  relations
+    define org: [org]
+    define is_self: [user]
+    define manager: [user]
+    define dotted_manager: [user]
+    define manager_emp: [employee]
+    define skip_manager: manager from manager_emp
+    define dept: [department]
+    define location: [location]
+    define delegate: [user with active_window]
+    define can_view_basic: is_self or manager or dotted_manager or skip_manager or head from dept or head from location or member from org
+    define can_view_sensitive: is_self or hr_admin from org
+    define can_edit: hr_admin from org
+    define can_approve_leave: manager or delegate or head from dept or hr_admin from org
+
+type config_area
+  relations
+    define org: [org]
+    define owner: [user, role#member]
+    define can_configure: owner or super_admin from org
+
+type job
+  relations
+    define org: [org]
+    define hiring_manager: [user]
+    define recruiter: [user]
+    define can_view: hiring_manager or recruiter or hr_admin from org
+    define can_approve_offer: hiring_manager or hr_admin from org
+
+type candidate
+  relations
+    define job: [job]
+    define interviewer: [user]
+    define can_view: interviewer or can_view from job
+    define can_give_feedback: interviewer
+
+condition active_window(current_time: timestamp, starts_at: timestamp, ends_at: timestamp) {
+  current_time >= starts_at && current_time <= ends_at
+}

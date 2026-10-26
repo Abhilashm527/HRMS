@@ -1,0 +1,35 @@
+# OpenFGA only — the application database is Neon.
+services:
+  openfga-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: openfga
+      POSTGRES_USER: openfga
+      POSTGRES_PASSWORD: openfga
+    volumes:
+      - fgadata:/var/lib/postgresql/data
+
+  openfga-migrate:
+    image: openfga/openfga:v1.22.0
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:openfga@openfga-db:5432/openfga?sslmode=disable
+    depends_on:
+      - openfga-db
+
+  openfga:
+    image: openfga/openfga:v1.22.0
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:openfga@openfga-db:5432/openfga?sslmode=disable
+    ports:
+      - "8080:8080"
+      - "3000:3000"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  fgadata:

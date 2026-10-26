@@ -1,0 +1,6 @@
+# Activate with SPRING_PROFILES_ACTIVE=local
+# Enables the X-Dev-User header filter (see SecurityConfig) so the API can be called without Entra ID.
+logging:
+  level:
+    org.flywaydb: info
+    org.hibernate.SQL: debug

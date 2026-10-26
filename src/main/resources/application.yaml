@@ -1,0 +1,61 @@
+server:
+  port: 8081
+
+spring:
+  config:
+    # reads ./.env (git-ignored) so DB_* etc. need no IDE/shell setup; real env vars still win
+    import: optional:file:.env[.properties]
+  application:
+    name: hrms
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:5432/${DB_NAME:neondb}?sslmode=require&channelBinding=require
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 20000
+  flyway:
+    url: jdbc:postgresql://ep-soft-dawn-ayk93irp.c-5.us-east-2.aws.neon.tech:5432/${DB_NAME:neondb}?sslmode=require
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      # a little over the 5 MB document limit so the service can answer FILE_TOO_LARGE itself
+      max-file-size: 6MB
+      max-request-size: 7MB
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    # no hibernate.jdbc.time_zone: it shifted plain `time` columns (opening hours) by the JVM's offset; timestamps
+    # are Instants on timestamptz columns and do not need it
+  docker:
+    compose:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:}
+
+hrms:
+  # single-tenant today: the org seeded by V3__org.sql
+  default-org-id: 00000000-0000-0000-0000-000000000001
+  # the first super admin: the employee with this work email (created if missing) while nobody holds super_admin
+  bootstrap-admin-email: ${HRMS_BOOTSTRAP_ADMIN_EMAIL:}
+
+openfga:
+  api-url: ${FGA_API_URL:http://localhost:8080}
+  store-id: ${FGA_STORE_ID:}
+  authorization-model-id: ${FGA_MODEL_ID:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
