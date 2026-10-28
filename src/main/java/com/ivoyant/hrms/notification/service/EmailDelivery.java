@@ -24,8 +24,11 @@ class EmailDelivery {
 	private final JdbcClient jdbc;
 	private final ObjectProvider<JavaMailSender> sender;
 	private final String from;
+	private final String host;
 
-	EmailDelivery(JdbcClient jdbc, ObjectProvider<JavaMailSender> sender, @Value("${hrms.mail-from:HRMS <no-reply@ivoyant.com>}") String from) {
+	EmailDelivery(JdbcClient jdbc, ObjectProvider<JavaMailSender> sender, @Value("${hrms.mail-from:HRMS <no-reply@ivoyant.com>}") String from,
+			@Value("${spring.mail.host:}") String host) {
+		this.host = host;
 		this.jdbc = jdbc;
 		this.sender = sender;
 		this.from = from;
@@ -35,7 +38,7 @@ class EmailDelivery {
 	@Transactional
 	void send() {
 		JavaMailSender mail = sender.getIfAvailable();
-		if (mail == null) {
+		if (mail == null || host == null || host.isBlank()) {
 			return;
 		}
 		for (var row : jdbc.sql("select id, to_address, cc_address, subject, html from notification_email where sent_at is null and error is null order by id limit 20 for update skip locked")

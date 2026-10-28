@@ -69,6 +69,9 @@ openfga:
   api-token: ${FGA_API_TOKEN:}
 
 management:
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

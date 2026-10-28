@@ -59,7 +59,7 @@ services:
     plan: free
     image:
       url: docker.io/openfga/openfga:v1.22.0
-    dockerCommand: run
+    dockerCommand: /openfga run   # Render replaces the image's entrypoint, so the program is named in full
     healthCheckPath: /healthz
     envVars:
       - key: PORT

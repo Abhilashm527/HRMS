@@ -17,6 +17,10 @@ springdoc:
     enabled: false
 
 management:
+  health:
+    # a missing or slow mail server must not make the whole app look unhealthy
+    mail:
+      enabled: false
   endpoint:
     health:
       probes:
