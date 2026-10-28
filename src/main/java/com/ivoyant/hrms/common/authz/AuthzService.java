@@ -172,8 +172,17 @@ public class AuthzService {
 		}
 		catch (Exception ex) {
 			interruptIfNeeded(ex);
-			throw new IllegalStateException("OpenFGA write failed", ex);
+			throw new IllegalStateException("OpenFGA write failed: " + rootMessage(ex), ex);
 		}
+	}
+
+	private static String rootMessage(Throwable ex) {
+		Throwable t = ex;
+		while (t.getCause() != null && t.getCause() != t) {
+			t = t.getCause();
+		}
+		String m = t.getMessage();
+		return t.getClass().getSimpleName() + (m == null ? "" : ": " + (m.length() > 300 ? m.substring(0, 300) : m));
 	}
 
 	private static void interruptIfNeeded(Exception ex) {

@@ -17,10 +17,12 @@ public class AuthProps {
 	private final String entraSecret;
 	private final String supportEmail;
 	private final boolean local;
+	private final int accessSeconds;
 
 	AuthProps(@Value("${hrms.auth.issuer:http://localhost:8081}") String issuer, @Value("${hrms.auth.app-base-url:http://localhost:3000}") String appBaseUrl,
 			@Value("${hrms.auth.key-enc:}") String keyEnc, @Value("${hrms.auth.entra.tenant-id:}") String entraTenant, @Value("${hrms.auth.entra.client-id:}") String entraClient,
-			@Value("${hrms.auth.entra.client-secret:}") String entraSecret, @Value("${hrms.auth.support-email:it-support@ivoyant.com}") String supportEmail, Environment env) {
+			@Value("${hrms.auth.entra.client-secret:}") String entraSecret, @Value("${hrms.auth.support-email:it-support@ivoyant.com}") String supportEmail,
+			@Value("${hrms.auth.access-ttl-seconds:900}") int accessSeconds, Environment env) {
 		this.issuer = issuer;
 		this.appBaseUrl = appBaseUrl.endsWith("/") ? appBaseUrl.substring(0, appBaseUrl.length() - 1) : appBaseUrl;
 		this.keyEnc = keyEnc;
@@ -28,6 +30,7 @@ public class AuthProps {
 		this.entraClient = entraClient;
 		this.entraSecret = entraSecret;
 		this.supportEmail = supportEmail;
+		this.accessSeconds = Math.max(300, Math.min(accessSeconds, 86400));
 		this.local = env.acceptsProfiles(Profiles.of("local"));
 		if (env.acceptsProfiles(Profiles.of("prod")) && local) {
 			throw new IllegalStateException("The local profile (dev header sign-in) must not run together with prod");
@@ -59,6 +62,11 @@ public class AuthProps {
 
 	String entraSecret() {
 		return entraSecret;
+	}
+
+	/** Access token lifetime, between 5 minutes and 1 day. */
+	public int accessSeconds() {
+		return accessSeconds;
 	}
 
 	public String supportEmail() {

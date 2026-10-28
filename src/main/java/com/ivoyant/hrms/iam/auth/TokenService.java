@@ -26,12 +26,11 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Access tokens (RS256, 15 minutes), rotating refresh tokens, and the session rows behind them. */
+/** Access tokens (RS256, 15 minutes by default), rotating refresh tokens, and the session rows behind them. */
 @Service
 public class TokenService {
 
 	static final String COOKIE = "hrms_rt";
-	static final int ACCESS_SECONDS = 900;
 	private static final Duration REMEMBER = Duration.ofDays(30);
 	private static final Duration REMEMBER_MAX = Duration.ofDays(90);
 	private static final Duration SHORT = Duration.ofHours(12);
@@ -60,7 +59,7 @@ public class TokenService {
 		try {
 			Instant now = Instant.now();
 			JWTClaimsSet claims = new JWTClaimsSet.Builder().issuer(props.issuer()).subject(userId.toString()).claim("emp", employeeId.toString()).claim("org", orgId.toString())
-					.claim("sid", sessionId.toString()).claim("amr", amr).issueTime(Date.from(now)).expirationTime(Date.from(now.plusSeconds(ACCESS_SECONDS)))
+					.claim("sid", sessionId.toString()).claim("amr", amr).issueTime(Date.from(now)).expirationTime(Date.from(now.plusSeconds(props.accessSeconds())))
 					.jwtID(UUID.randomUUID().toString()).build();
 			RSAKey key = keys.signingKey();
 			SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(), claims);

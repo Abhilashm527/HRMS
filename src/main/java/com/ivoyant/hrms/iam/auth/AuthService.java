@@ -299,7 +299,7 @@ public class AuthService {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put("status", "OK");
 		m.put("accessToken", issued.accessToken());
-		m.put("expiresIn", TokenService.ACCESS_SECONDS);
+		m.put("expiresIn", authProps.accessSeconds());
 		m.put("landing", landing(a.userId()));
 		m.put("user", userView(a));
 		return m;
