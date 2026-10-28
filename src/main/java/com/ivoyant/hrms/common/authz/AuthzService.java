@@ -140,7 +140,8 @@ public class AuthzService {
 		if (tuples.isEmpty()) {
 			return;
 		}
-		List<ClientTupleKey> keys = tuples.stream().map(AuthzService::toKey).toList();
+		// OpenFGA rejects a request that repeats a tuple; the outbox can hold the same one twice
+		List<ClientTupleKey> keys = tuples.stream().distinct().map(AuthzService::toKey).toList();
 		send(ClientWriteRequest.ofWrites(keys));
 	}
 
@@ -148,7 +149,7 @@ public class AuthzService {
 		if (tuples.isEmpty()) {
 			return;
 		}
-		List<ClientTupleKeyWithoutCondition> keys = tuples.stream()
+		List<ClientTupleKeyWithoutCondition> keys = tuples.stream().distinct()
 				.map(t -> new ClientTupleKeyWithoutCondition().user(t.user()).relation(t.relation())._object(t.object()))
 				.toList();
 		send(ClientWriteRequest.ofDeletes(keys));
