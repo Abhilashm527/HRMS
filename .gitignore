@@ -34,3 +34,6 @@ build/
 
 ### Local env ###
 .env
+
+### runtime data (uploads) ###
+data/

@@ -24,7 +24,7 @@ import org.springframework.util.StreamUtils;
  * Never fails startup: if OpenFGA is not reachable the app runs and denies every authorization check.
  */
 @Component
-@Profile("local")
+@Profile({"local", "fga-setup"})
 @Order(1)
 class FgaBootstrap implements ApplicationRunner {
 

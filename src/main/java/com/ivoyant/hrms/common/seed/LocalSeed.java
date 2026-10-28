@@ -233,7 +233,7 @@ class LocalSeed implements ApplicationRunner {
 						.param("emp", employeeId(e.code())).param("dept", id("department", e.dept())).update();
 			}
 			UUID userId = id("user", e.code());
-			count += jdbc.sql("insert into app_user (id, org_id, employee_id) values (:id, :org, :emp) "
+			count += jdbc.sql("insert into app_user (id, org_id, employee_id, email, activated_at) select :id, :org, e.id, lower(e.work_email), now() from employee e where e.id = :emp "
 					+ "on conflict do nothing")
 					.param("id", userId).param("org", ORG).param("emp", employeeId(e.code())).update();
 			count += assignRole(userId, "employee", "OWN");

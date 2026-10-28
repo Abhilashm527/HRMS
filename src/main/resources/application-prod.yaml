@@ -1,0 +1,28 @@
+# Production settings (SPRING_PROFILES_ACTIVE=prod). Everything secret comes from environment variables.
+server:
+  # hosts such as Render tell the app which port to listen on
+  port: ${PORT:8081}
+  # behind the host's proxy: trust X-Forwarded-* so https links and secure cookies are right
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  jpa:
+    show-sql: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: info
+    org.hibernate.SQL: warn

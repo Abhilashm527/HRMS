@@ -37,8 +37,10 @@ class BootstrapAdmin implements ApplicationRunner {
 	private final EmployeeCodes codes;
 	private final FgaOutbox fga;
 	private final Audit audit;
+	private final org.springframework.context.ApplicationEventPublisher events;
 
-	BootstrapAdmin(HrmsProperties props, JdbcClient jdbc, EmployeeCodes codes, FgaOutbox fga, Audit audit) {
+	BootstrapAdmin(HrmsProperties props, JdbcClient jdbc, EmployeeCodes codes, FgaOutbox fga, Audit audit, org.springframework.context.ApplicationEventPublisher events) {
+		this.events = events;
 		this.props = props;
 		this.jdbc = jdbc;
 		this.codes = codes;
@@ -68,15 +70,17 @@ class BootstrapAdmin implements ApplicationRunner {
 		UUID user = jdbc.sql("select id from app_user where employee_id = :e").param("e", employee).query(UUID.class)
 				.optional().orElseGet(() -> {
 					UUID id = UUID.randomUUID();
-					jdbc.sql("insert into app_user (id, org_id, employee_id) values (:id, :org, :e)")
-							.param("id", id).param("org", org).param("e", employee).update();
+					jdbc.sql("insert into app_user (id, org_id, employee_id, email, status, break_glass, activated_at) values (:id, :org, :e, :email, 'ACTIVE', true, now())")
+							.param("id", id).param("org", org).param("e", employee).param("email", work).update();
 					return id;
 				});
+		jdbc.sql("update app_user set break_glass = true where id = :id").param("id", user).update();
 		assign(org, user, employee, "employee", "OWN");
 		assign(org, user, employee, "super_admin", "ORGANIZATION");
 		fga.write(FgaTuples.orgRole(org, employee, "super_admin"));
 		audit.publish("iam", "UserRole", user, "BOOTSTRAP", null, Map.of("role", "super_admin", "email", work));
 		log.info("{} is now a super admin (bootstrap)", work);
+		events.publishEvent(new com.ivoyant.hrms.common.event.BootstrapAdminReadyEvent(employee));
 	}
 
 	private UUID createEmployee(UUID org, String email) {

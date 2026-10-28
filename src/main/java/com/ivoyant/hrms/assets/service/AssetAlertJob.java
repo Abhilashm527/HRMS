@@ -24,8 +24,10 @@ class AssetAlertJob {
 
 	private final JdbcClient jdbc;
 	private final ObjectProvider<AssetAlertSource> sources;
+	private final com.ivoyant.hrms.notification.Notifier notifier;
 
-	AssetAlertJob(JdbcClient jdbc, ObjectProvider<AssetAlertSource> sources) {
+	AssetAlertJob(JdbcClient jdbc, ObjectProvider<AssetAlertSource> sources, com.ivoyant.hrms.notification.Notifier notifier) {
+		this.notifier = notifier;
 		this.jdbc = jdbc;
 		this.sources = sources;
 	}
@@ -47,10 +49,26 @@ class AssetAlertJob {
 					if (inserted > 0) {
 						sent++;
 						log.info("Asset alert '{}': {} is due on {}", rule[3], d.label(), due);
+						if ((Boolean) rule[5]) {
+							java.util.Set<UUID> to = new java.util.LinkedHashSet<>(assetsTeam());
+							if (d.holderEmployeeId() != null) {
+								to.add(d.holderEmployeeId());
+							}
+							String type = "SOFTWARE".equals(rule[1]) ? "LICENSE_RENEWAL" : "ASSET_ALERT";
+							notifier.inApp(to, type, rule[3] + " · " + rule[4] + " days", d.label() + " · " + due, "/assets");
+						}
 					}
 				}
 			}
 		}
 		return sent;
+	}
+
+	/** People who run the register: anyone whose role can edit the assets module. */
+	private List<UUID> assetsTeam() {
+		return jdbc.sql("""
+				select distinct u.employee_id from user_role ur join role r on r.id = ur.role_id join app_user u on u.id = ur.user_id
+				join role_permission rp on rp.role_id = r.id join permission p on p.id = rp.permission_id
+				where p.module = 'assets' and p.action = 'edit'""").query(UUID.class).list();
 	}
 }

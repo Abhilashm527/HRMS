@@ -27,4 +27,17 @@ public class AppUser extends TenantScoped {
 
 	@Column(name = "last_login_at")
 	private Instant lastLoginAt;
+
+	/** Lower-case work email, kept in step with the employee's. */
+	@Column(name = "email", nullable = false)
+	private String email;
+
+	@Column(name = "break_glass", nullable = false)
+	private boolean breakGlass;
+
+	@Column(name = "invited_at")
+	private Instant invitedAt;
+
+	@Column(name = "activated_at")
+	private Instant activatedAt;
 }

@@ -21,7 +21,10 @@ class UserProvisioning {
 	private final UserRoleRepository userRoles;
 	private final FgaOutbox fga;
 
-	UserProvisioning(AppUserRepository users, RoleRepository roles, UserRoleRepository userRoles, FgaOutbox fga) {
+	private final org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
+	UserProvisioning(AppUserRepository users, RoleRepository roles, UserRoleRepository userRoles, FgaOutbox fga, org.springframework.jdbc.core.simple.JdbcClient jdbc) {
+		this.jdbc = jdbc;
 		this.users = users;
 		this.roles = roles;
 		this.userRoles = userRoles;
@@ -36,6 +39,8 @@ class UserProvisioning {
 		AppUser user = new AppUser();
 		user.setOrgId(event.orgId());
 		user.setEmployeeId(event.employeeId());
+		user.setEmail(jdbc.sql("select lower(work_email) from employee where id = :id").param("id", event.employeeId()).query(String.class).single());
+		user.setStatus("INVITED");
 		users.saveAndFlush(user);
 		roles.findByOrgIdAndRoleKey(event.orgId(), "employee").ifPresent(role -> {
 			UserRole ur = new UserRole();

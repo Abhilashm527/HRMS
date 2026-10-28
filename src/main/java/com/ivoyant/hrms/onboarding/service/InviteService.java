@@ -1,6 +1,5 @@
 package com.ivoyant.hrms.onboarding.service;
 
-import com.ivoyant.hrms.assets.AssetIssuer;
 import com.ivoyant.hrms.common.audit.Audit;
 import com.ivoyant.hrms.common.security.CurrentUser;
 import com.ivoyant.hrms.common.web.CodedConflictException;
@@ -51,11 +50,10 @@ public class InviteService {
 	private final OnboardingSettings settings;
 	private final OrgProfile orgProfile;
 	private final OrgDirectory org;
-	private final AssetIssuer assets;
 	private final CurrentUser currentUser;
 
 	InviteService(JdbcClient jdbc, HireRepo repo, OnboardingConfig config, Notifier notifier, EventLog events, Audit audit,
-			HireStatusService status, OnboardingSettings settings, OrgProfile orgProfile, OrgDirectory org, AssetIssuer assets,
+			HireStatusService status, OnboardingSettings settings, OrgProfile orgProfile, OrgDirectory org,
 			CurrentUser currentUser) {
 		this.jdbc = jdbc;
 		this.repo = repo;
@@ -67,7 +65,6 @@ public class InviteService {
 		this.settings = settings;
 		this.orgProfile = orgProfile;
 		this.org = org;
-		this.assets = assets;
 		this.currentUser = currentUser;
 	}
 
@@ -99,10 +96,6 @@ public class InviteService {
 		}
 		requireInvitable(h);
 		String token = issue(h, true);
-		if (jdbc.sql("select count(*) from onboarding_task where hire_id = :h and owner = 'IT' and lower(name) like '%laptop%'")
-				.param("h", hireId).query(Long.class).single() > 0) {
-			assets.requestLaptop(hireId);
-		}
 		events.add(hireId, "MAIL", "Invite sent", "To " + h.personalEmail());
 		audit.publish("onboarding", "Hire", hireId, "INVITE", null, h.personalEmail());
 		status.recompute(hireId);

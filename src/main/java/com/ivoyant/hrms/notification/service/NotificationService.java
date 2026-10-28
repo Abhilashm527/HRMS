@@ -53,6 +53,15 @@ class NotificationService implements Notifier {
 
 	@Override
 	@Transactional
+	public void inApp(Collection<UUID> employeeIds, String type, String title, String body, String link) {
+		for (UUID id : employeeIds) {
+			jdbc.sql("insert into notification_inbox (org_id, employee_id, type, title, body, link) values (:org, :e, :ty, :t, :b, :l)")
+					.param("org", currentUser.orgId()).param("e", id).param("ty", type).param("t", title).param("b", body).param("l", link).update();
+		}
+	}
+
+	@Override
+	@Transactional
 	public void inAppBatched(Collection<UUID> employeeIds, String title, String body, String link, int windowMinutes) {
 		for (UUID id : employeeIds) {
 			boolean recent = jdbc.sql("select count(*) from notification_inbox where employee_id = :e and title = :t and coalesce(link, '') = coalesce(:l, '') and created_at > now() - make_interval(mins => :m)")

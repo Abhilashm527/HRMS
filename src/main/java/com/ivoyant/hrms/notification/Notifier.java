@@ -15,6 +15,9 @@ public interface Notifier {
 	/** Puts a message in each employee's in-app inbox. {@code link} may be null. */
 	void inApp(Collection<UUID> employeeIds, String title, String body, String link);
 
+	/** In-app message with a type (for example ASSET_ALERT) so screens can list and clear one kind. */
+	void inApp(Collection<UUID> employeeIds, String type, String title, String body, String link);
+
 	/** Like {@link #inApp} but skips people who already got the same title and link within {@code windowMinutes}. */
 	void inAppBatched(Collection<UUID> employeeIds, String title, String body, String link, int windowMinutes);
 }

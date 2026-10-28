@@ -29,8 +29,8 @@ public class CurrentUser {
 			return app.employeeId();
 		}
 		if (principal instanceof Jwt jwt) {
-			UUID claim = asUuid(jwt.getClaimAsString("employee_id"));
-			return claim != null ? claim : asUuid(jwt.getSubject());
+			UUID claim = asUuid(jwt.getClaimAsString("emp"));
+			return claim != null ? claim : asUuid(jwt.getClaimAsString("employee_id"));
 		}
 		return null;
 	}
@@ -49,7 +49,7 @@ public class CurrentUser {
 			return app.orgId();
 		}
 		if (principal instanceof Jwt jwt) {
-			UUID claim = asUuid(jwt.getClaimAsString("org_id"));
+			UUID claim = asUuid(jwt.getClaimAsString("org"));
 			if (claim != null) {
 				return claim;
 			}

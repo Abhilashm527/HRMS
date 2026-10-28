@@ -7,6 +7,7 @@ import com.ivoyant.hrms.common.web.CodedConflictException;
 import com.ivoyant.hrms.common.web.ErrorItem;
 import com.ivoyant.hrms.common.web.StatusException;
 import com.ivoyant.hrms.common.web.UnprocessableException;
+import com.ivoyant.hrms.assets.AssetIssuer;
 import com.ivoyant.hrms.common.storage.FileStore;
 import com.ivoyant.hrms.employee.EmployeeDocuments;
 import com.ivoyant.hrms.employee.EmployeeProvisioning;
@@ -44,10 +45,12 @@ public class HireJoinService {
 	private final CurrentUser currentUser;
 	private final EmployeeDocuments employeeDocuments;
 	private final FileStore store;
+	private final AssetIssuer assets;
 
 	HireJoinService(JdbcClient jdbc, HireRepo repo, HireStatusService status, EmployeeProvisioning employees, PortalService portal,
 			InviteService invites, EventLog events, Audit audit, Notifier notifier, HrOwners owners, ApplicationEventPublisher publisher,
-			CurrentUser currentUser, EmployeeDocuments employeeDocuments, FileStore store) {
+			CurrentUser currentUser, EmployeeDocuments employeeDocuments, FileStore store, AssetIssuer assets) {
+		this.assets = assets;
 		this.employeeDocuments = employeeDocuments;
 		this.store = store;
 		this.jdbc = jdbc;
@@ -128,6 +131,14 @@ public class HireJoinService {
 				.param("e", employeeId).param("t", titleId, java.sql.Types.OTHER).param("id", hireId).update();
 		jdbc.sql("update employee set hire_id = :h where id = :e").param("h", hireId).param("e", employeeId).update();
 		copyDocuments(hireId, employeeId);
+		if (jdbc.sql("select count(*) from onboarding_task where hire_id = :h and owner = 'IT' and lower(name) like '%laptop%'").param("h", hireId).query(Long.class).single() > 0) {
+			try {
+				assets.requestLaptop(employeeId, null, h.doj());
+			}
+			catch (RuntimeException ex) {
+				events.add(hireId, "BAD", "Laptop request not created", ex.getMessage());
+			}
+		}
 		invites.revoke(hireId);
 		if (!Boolean.TRUE.equals(m365.get("sim")) && !"null".equals(m365.get("entra"))) {
 			jdbc.sql("update app_user set external_subject = :s where employee_id = :e and external_subject is null").param("s", m365.get("entra")).param("e", employeeId).update();

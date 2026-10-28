@@ -1,0 +1,76 @@
+# Render blueprint: the API and the OpenFGA authorization server, both on the free plan.
+# Databases are on Neon (free). Secrets are asked for when the blueprint is created (sync: false).
+services:
+  - type: web
+    name: hrms-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod              # first deploy only: prod,fga-setup (see DEPLOY.md), then back to prod
+      - key: DB_HOST
+        sync: false              # Neon pooled host of the HRMS database
+      - key: DB_HOST_DIRECT
+        sync: false              # Neon direct host (used by migrations)
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: AUTH_KEY_ENC
+        sync: false              # openssl rand -base64 32  (keep it: it unlocks stored two-step secrets)
+      - key: AUTH_ISSUER
+        sync: false              # public address of this API, e.g. https://hrms-api.onrender.com
+      - key: APP_BASE_URL
+        sync: false              # address of the web app that calls this API
+      - key: HRMS_BOOTSTRAP_ADMIN_EMAIL
+        sync: false              # the first super admin
+      - key: FGA_API_URL
+        sync: false              # public address of hrms-fga
+      - key: FGA_API_TOKEN
+        sync: false
+      - key: FGA_STORE_ID
+        sync: false
+      - key: FGA_MODEL_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false              # optional: needed to send invite and reset emails
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: ENTRA_TENANT_ID
+        sync: false              # optional: Microsoft sign-in
+      - key: ENTRA_CLIENT_ID
+        sync: false
+      - key: ENTRA_CLIENT_SECRET
+        sync: false
+
+  - type: web
+    name: hrms-fga
+    runtime: image
+    plan: free
+    image:
+      url: docker.io/openfga/openfga:v1.22.0
+    dockerCommand: run
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: OPENFGA_HTTP_ADDR
+        value: 0.0.0.0:8080
+      - key: OPENFGA_DATASTORE_ENGINE
+        value: postgres
+      - key: OPENFGA_DATASTORE_URI
+        sync: false              # postgres://user:pass@host/openfga?sslmode=require (its own Neon database)
+      - key: OPENFGA_AUTHN_METHOD
+        value: preshared
+      - key: OPENFGA_AUTHN_PRESHARED_KEYS
+        sync: false              # the same value as FGA_API_TOKEN

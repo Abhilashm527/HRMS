@@ -1,15 +1,15 @@
-package com.ivoyant.hrms.employee.service;
+package com.ivoyant.hrms.common.util;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /** Just enough CSV (RFC 4180): quoted fields, doubled quotes, newlines inside quotes. */
-final class Csv {
+public final class Csv {
 
 	private Csv() {
 	}
 
-	static List<List<String>> parse(String text) {
+	public static List<List<String>> parse(String text) {
 		List<List<String>> rows = new ArrayList<>();
 		List<String> row = new ArrayList<>();
 		StringBuilder cell = new StringBuilder();
@@ -61,7 +61,7 @@ final class Csv {
 	}
 
 	/** One cell, quoted; a leading = + - @ is defused so a spreadsheet does not run it as a formula. */
-	static String cell(Object o) {
+	public static String cell(Object o) {
 		String s = o == null ? "" : o.toString();
 		if (!s.isEmpty() && "=+-@".indexOf(s.charAt(0)) >= 0) {
 			s = "'" + s;
