@@ -108,7 +108,7 @@ public class AuthzService {
 		try {
 			ClientCheckRequest request = new ClientCheckRequest().user(user).relation(relation)._object(object)
 					.context(Map.of("current_time", Instant.now().toString()));
-			boolean allowed = Boolean.TRUE.equals(client.check(request).get().getAllowed());
+			boolean allowed = retrying(() -> Boolean.TRUE.equals(client.check(request).get().getAllowed()));
 			checkCache.put(key, allowed);
 			return allowed;
 		}
@@ -119,6 +119,51 @@ public class AuthzService {
 		}
 	}
 
+	/** How long a check waits for OpenFGA to come back (a sleeping host takes 10–30 s to wake) before denying. */
+	private static final Duration CHECK_PATIENCE = Duration.ofSeconds(20);
+
+	private interface Call<T> {
+		T run() throws Exception;
+	}
+
+	/**
+	 * Runs an OpenFGA call, retrying while the failure is temporary (OpenFGA unreachable, 5xx, timeouts) for up to
+	 * {@link #CHECK_PATIENCE}. Anything else, or running out of time, is thrown to the caller.
+	 */
+	private <T> T retrying(Call<T> call) throws Exception {
+		long deadline = System.nanoTime() + CHECK_PATIENCE.toNanos();
+		long pause = 500;
+		while (true) {
+			try {
+				return call.run();
+			}
+			catch (Exception ex) {
+				if (!isTransient(ex) || System.nanoTime() + pause * 1_000_000 > deadline) {
+					throw ex;
+				}
+				log.warn("OpenFGA unavailable ({}); retrying in {} ms", rootMessage(ex), pause);
+				Thread.sleep(pause);
+				pause = Math.min(pause * 2, 4000);
+			}
+		}
+	}
+
+	/** True when the failure means "OpenFGA is not answering right now" rather than "OpenFGA said no". */
+	static boolean isTransient(Throwable ex) {
+		for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+			String name = t.getClass().getSimpleName();
+			if (name.equals("FgaApiInternalError") || name.equals("FgaApiRateLimitExceededError") || t instanceof java.io.IOException
+					|| t instanceof java.util.concurrent.TimeoutException) {
+				return true;
+			}
+			String m = t.getMessage();
+			if (m != null && (m.contains("HTTP 502") || m.contains("HTTP 503") || m.contains("HTTP 504"))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Object ids of {@code type} the user has {@code relation} on, e.g. {@code employee:<uuid>}. */
 	public List<String> listObjects(String user, String relation, String type) {
 		if (!configured()) {
@@ -127,7 +172,7 @@ public class AuthzService {
 		try {
 			ClientListObjectsRequest request = new ClientListObjectsRequest().user(user).relation(relation).type(type)
 					.context(Map.of("current_time", Instant.now().toString()));
-			List<String> objects = client.listObjects(request).get().getObjects();
+			List<String> objects = retrying(() -> client.listObjects(request).get().getObjects());
 			return objects != null ? objects : List.of();
 		}
 		catch (Exception ex) {

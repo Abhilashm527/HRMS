@@ -22,7 +22,11 @@ public class FgaOutbox {
 
 	private static final Logger log = LoggerFactory.getLogger(FgaOutbox.class);
 	private static final int BATCH_SIZE = 100;
-	private static final int MAX_ATTEMPTS = 10;
+	/** Rows OpenFGA itself rejects (bad data) are parked after this many tries; "unreachable" never parks a row. */
+	private static final int MAX_REJECTED_ATTEMPTS = 10;
+	/** First gap between retries while OpenFGA is unavailable; it doubles each time up to {@link #MAX_GAP_SECONDS}. */
+	private static final int FIRST_GAP_SECONDS = 15;
+	private static final int MAX_GAP_SECONDS = 600;
 	private static final int MAX_BATCHES_PER_RUN = 20;
 
 	private final JdbcClient jdbc;
@@ -71,14 +75,23 @@ public class FgaOutbox {
 	/** Pushes one batch of consecutive same-op rows; returns true if more work may remain. */
 	@Transactional
 	boolean drainBatch() {
+		// Changes must reach OpenFGA in order, so when the oldest waiting row isn't due for a retry yet, nothing goes.
+		Boolean waiting = jdbc.sql("""
+				select coalesce(next_attempt_at > now(), false) from fga_outbox
+				where processed_at is null and gave_up_at is null
+				order by created_at, id
+				limit 1
+				""").query(Boolean.class).optional().orElse(false);
+		if (Boolean.TRUE.equals(waiting)) {
+			return false;
+		}
 		List<Row> rows = jdbc.sql("""
 				select id, op, tuple::text as tuple from fga_outbox
-				where processed_at is null and attempts < :max
+				where processed_at is null and gave_up_at is null
 				order by created_at, id
 				limit :limit
 				for update skip locked
 				""")
-				.param("max", MAX_ATTEMPTS)
 				.param("limit", BATCH_SIZE)
 				.query((rs, i) -> new Row(rs.getObject("id", UUID.class), rs.getString("op"), rs.getString("tuple")))
 				.list();
@@ -102,9 +115,19 @@ public class FgaOutbox {
 			return rows.size() == BATCH_SIZE || batch.size() < rows.size();
 		}
 		catch (RuntimeException ex) {
-			log.warn("Failed to push {} outbox row(s) to OpenFGA: {}", batch.size(), ex.getMessage());
-			jdbc.sql("update fga_outbox set attempts = attempts + 1, last_error = :err where id in (:ids)")
+			boolean unavailable = AuthzService.isTransient(ex);
+			log.warn("Failed to push {} outbox row(s) to OpenFGA ({}): {}", batch.size(), unavailable ? "will retry" : "rejected", ex.getMessage());
+			// Growing gap per row; a row OpenFGA keeps rejecting is parked so it can't hold up the rest for ever.
+			jdbc.sql("""
+					update fga_outbox set attempts = attempts + 1, last_error = :err,
+					  next_attempt_at = now() + make_interval(secs => least(:first * power(2, least(attempts, 10)), :cap)),
+					  gave_up_at = case when not :unavailable and attempts + 1 >= :max then now() end
+					where id in (:ids)""")
 					.param("err", String.valueOf(ex.getMessage()))
+					.param("first", FIRST_GAP_SECONDS)
+					.param("cap", MAX_GAP_SECONDS)
+					.param("unavailable", unavailable)
+					.param("max", MAX_REJECTED_ATTEMPTS)
 					.param("ids", batch.stream().map(Row::id).toList())
 					.update();
 			return false;
