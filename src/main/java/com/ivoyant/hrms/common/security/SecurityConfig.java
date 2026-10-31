@@ -32,6 +32,7 @@ public class SecurityConfig {
 						.requestMatchers("/error").permitAll()
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers("/api/v1/portal/**").permitAll() // new-hire portal: authenticated by the invite token
+						.requestMatchers(HttpMethod.GET, "/api/v1/calendar/ical/*").permitAll() // calendar subscription: the link's token is the credential
 						.requestMatchers("/api/v1/auth/**", "/.well-known/jwks.json").permitAll() // sign-in itself; /auth/me checks the token on its own
 						.requestMatchers("/api/**").authenticated()
 						.anyRequest().denyAll())

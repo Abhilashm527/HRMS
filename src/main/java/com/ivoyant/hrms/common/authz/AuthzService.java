@@ -54,6 +54,11 @@ public class AuthzService {
 		return StringUtils.hasText(storeId);
 	}
 
+	/** The store in use (configured or created by the local bootstrap); null when none. */
+	public String storeId() {
+		return storeId;
+	}
+
 	/** Point the client at a store (and optionally a model); used by the local bootstrap. */
 	public void useStore(String storeId, String authorizationModelId) {
 		this.storeId = storeId;

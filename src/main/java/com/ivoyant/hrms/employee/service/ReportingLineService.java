@@ -126,6 +126,20 @@ public class ReportingLineService {
 					return 0;
 				}).list();
 		Map<UUID, String> departments = names("select id, name from department where org_id = :org");
+		// the same sets with ids, so the Reporting lines screen can edit them
+		Map<UUID, List<Map<String, Object>>> teamItems = new HashMap<>();
+		jdbc.sql("select m.employee_id, t.id, t.name, m.is_primary from team_member m join team t on t.id = m.team_id where m.org_id = :org and m.until is null order by m.is_primary desc, t.name")
+				.param("org", currentUser.orgId()).query((rs, i) -> teamItems.computeIfAbsent(rs.getObject(1, UUID.class), k -> new ArrayList<>())
+						.add(Map.of("teamId", rs.getObject(2, UUID.class), "name", rs.getString(3), "primary", rs.getBoolean(4))))
+				.list();
+		Map<UUID, List<Map<String, Object>>> projectItems = new HashMap<>();
+		jdbc.sql("select m.employee_id, p.id, p.name, m.allocation, coalesce(m.role, '') from project_member m join project p on p.id = m.project_id where m.org_id = :org and m.until is null order by m.allocation desc, p.name")
+				.param("org", currentUser.orgId()).query((rs, i) -> projectItems.computeIfAbsent(rs.getObject(1, UUID.class), k -> new ArrayList<>())
+						.add(Map.of("projectId", rs.getObject(2, UUID.class), "name", rs.getString(3), "allocation", rs.getInt(4), "role", rs.getString(5))))
+				.list();
+		Map<UUID, List<UUID>> extraIds = new HashMap<>();
+		jdbc.sql("select employee_id, department_id from employee_extra_department where org_id = :org").param("org", currentUser.orgId())
+				.query((rs, i) -> extraIds.computeIfAbsent(rs.getObject(1, UUID.class), k -> new ArrayList<>()).add(rs.getObject(2, UUID.class))).list();
 		Map<UUID, String> positionNames = names("select id, title from designation where org_id = :org");
 		String needle = q == null ? null : q.trim().toLowerCase(Locale.ROOT);
 		int span = settings.maxSpan();
@@ -158,6 +172,10 @@ public class ReportingLineService {
 			UUID d = dotted.get(e.id());
 			row.put("dotted", d == null || all.get(d) == null ? null : Map.of("id", d, "name", all.get(d).name()));
 			row.put("position", e.position() == null ? null : positionNames.get(e.position()));
+			row.put("departmentId", e.department());
+			row.put("extraDepartmentIds", extraIds.getOrDefault(e.id(), List.of()));
+			row.put("teamItems", teamItems.getOrDefault(e.id(), List.of()));
+			row.put("projectItems", projectItems.getOrDefault(e.id(), List.of()));
 			row.put("type", e.type());
 			row.put("reports", reports);
 			row.put("noManager", noManager);

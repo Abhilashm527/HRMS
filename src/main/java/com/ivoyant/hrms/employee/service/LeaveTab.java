@@ -1,45 +1,23 @@
 package com.ivoyant.hrms.employee.service;
 
-import com.ivoyant.hrms.leave.LeavePolicy;
-import com.ivoyant.hrms.leave.LeaveTypeView;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
 import org.springframework.stereotype.Component;
 
-/** The Leave tab: the types this person is eligible for. Balances and requests fill in when the leave ledger exists. */
+import com.ivoyant.hrms.leave.LeaveSummary;
+
+/** The Leave tab: the year's balances and requests, from the leave module. */
 @Component
 class LeaveTab {
 
-	private final LeavePolicy policy;
+	private final LeaveSummary leave;
 
-	LeaveTab(LeavePolicy policy) {
-		this.policy = policy;
+	LeaveTab(LeaveSummary leave) {
+		this.leave = leave;
 	}
 
 	Map<String, Object> forEmployee(UUID employeeId, int year, boolean canApply) {
-		List<Map<String, Object>> balances = new ArrayList<>();
-		for (LeaveTypeView t : policy.activeTypes()) {
-			if (!policy.eligible(employeeId, t, LocalDate.now())) {
-				continue;
-			}
-			Map<String, Object> m = new LinkedHashMap<>();
-			m.put("code", t.code());
-			m.put("name", t.name());
-			m.put("quota", t.quota());
-			m.put("used", 0);
-			m.put("available", t.quota());
-			m.put("access", "VIEW");
-			balances.add(m);
-		}
-		Map<String, Object> out = new LinkedHashMap<>();
-		out.put("year", year);
-		out.put("balances", balances);
-		out.put("requests", List.of());
-		out.put("canApply", canApply);
-		return out;
+		return leave.forEmployee(employeeId, year, canApply);
 	}
 }
