@@ -59,7 +59,7 @@ public class HardwareService {
 			       a.vendor, a.invoice_no, a.purchase_cost, a.purchased_on, a.warranty_from, a.warranty_until, a.insurer, a.policy_no, a.insured_until, a.return_due,
 			       a.lost, a.retired_on, a.retire_reason, a.notes, a.created_by, a.created_at, a.updated_by, a.updated_at, a.version,
 			       ag.employee_id as holder_id, ag.assigned_on as since, h.employee_code as h_code, h.display_name as h_name, h.first_name as h_first, h.last_name as h_last,
-			       ht.name as h_title, h.photo_version as h_photo""";
+			       ht.name as h_title, h.photo_version as h_photo, (select d.name from department d where d.id = h.department_id) as h_dept""";
 
 	private final JdbcClient jdbc;
 	private final CurrentUser currentUser;
@@ -115,7 +115,7 @@ public class HardwareService {
 		Status st = new Status(rs.getObject("status_id", UUID.class), rs.getString("status_name"), rs.getInt("status_color"), assignable, sys, true, KIND);
 		m.put("status", st.view());
 		m.put("holder", held ? AssetSupport.card(rs.getObject("holder_id", UUID.class), rs.getString("h_code"), rs.getString("h_name"), rs.getString("h_first"),
-				rs.getString("h_last"), rs.getString("h_title"), null, rs.getInt("h_photo")) : null);
+				rs.getString("h_last"), rs.getString("h_title"), rs.getString("h_dept"), rs.getInt("h_photo")) : null);
 		m.put("since", rs.getObject("since", LocalDate.class));
 		m.put("warranty", support.dateState(rs.getObject("warranty_from", LocalDate.class), rs.getObject("warranty_until", LocalDate.class)));
 		Map<String, Object> actions = new LinkedHashMap<>();
@@ -349,8 +349,9 @@ public class HardwareService {
 			for (String c : new String[] {"id", "tag", "model", "serial", "type_id", "type_name", "max_age_years", "cat_id", "cat_name", "status_id", "status_name", "status_color",
 					"assignable", "system_key", "ownership_id", "own_name", "own_data", "location_id", "loc_name", "vendor", "invoice_no", "purchase_cost", "purchased_on",
 					"warranty_from", "warranty_until", "insurer", "policy_no", "insured_until", "return_due", "lost", "retired_on", "retire_reason", "notes", "created_by",
-					"created_at", "updated_by", "updated_at", "version", "holder_id", "since", "h_code", "h_name", "h_first", "h_last", "h_title", "h_photo"}) {
-				m.put(c, r.getObject(c));
+					"created_at", "updated_by", "updated_at", "version", "holder_id", "since", "h_code", "h_name", "h_first", "h_last", "h_title", "h_photo", "h_dept"}) {
+				Object v = r.getObject(c);
+				m.put(c, v instanceof java.sql.Date d ? d.toLocalDate() : v);
 			}
 			return m;
 		}).optional().orElseThrow(() -> new NotFoundException("Asset " + id + " not found"));
@@ -435,7 +436,7 @@ public class HardwareService {
 
 	private Map<String, Object> holder(Map<String, Object> r) {
 		Map<String, Object> m = AssetSupport.card((UUID) r.get("holder_id"), (String) r.get("h_code"), (String) r.get("h_name"), (String) r.get("h_first"), (String) r.get("h_last"),
-				(String) r.get("h_title"), null, ((Number) r.get("h_photo")).intValue());
+				(String) r.get("h_title"), (String) r.get("h_dept"), ((Number) r.get("h_photo")).intValue());
 		m.put("since", r.get("since"));
 		return m;
 	}

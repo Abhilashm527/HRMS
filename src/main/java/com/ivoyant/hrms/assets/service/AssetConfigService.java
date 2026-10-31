@@ -29,6 +29,9 @@ public class AssetConfigService {
 			java.sql.ResultSetMetaData md = rs.getMetaData();
 			for (int c = 1; c <= md.getColumnCount(); c++) {
 				Object v = rs.getObject(c);
+				if (v instanceof java.sql.Array a) {
+					v = java.util.Arrays.asList((Object[]) a.getArray());
+				}
 				m.put(md.getColumnLabel(c), v instanceof java.util.UUID u ? u.toString() : v);
 			}
 			return m;
@@ -47,7 +50,7 @@ public class AssetConfigService {
 				? "select id, name, category_id as \"categoryId\", icon, max_age_years as \"maxAgeYears\" from asset_type where org_id = :org and kind = :kind and active order by sort, name"
 				: "select id, name, billing, unit from asset_type where org_id = :org and kind = :kind and active order by sort, name", k));
 		if (hw) {
-			out.put("ownership", rows("select id, name, capture_fields as \"captureFields\", return_required as \"returnRequired\" from asset_ownership where org_id = :org and active and :kind = :kind order by sort, name", k));
+			out.put("ownership", rows("select id, name, array(select jsonb_array_elements_text(capture_fields)) as \"captureFields\", return_required as \"returnRequired\" from asset_ownership where org_id = :org and active and :kind = :kind order by sort, name", k));
 		}
 		out.put("idFormats", rows("select id, ownership_id as \"ownershipId\", license_type_id as \"licenseTypeId\", fmt from asset_id_format where org_id = :org and kind = :kind and active order by sort", k));
 		out.put("alerts", rows("select id, event, name, days_before as \"daysBefore\", in_app as \"inApp\", email from asset_alert_rule where org_id = :org and kind = :kind and active order by sort", k));
@@ -74,7 +77,7 @@ public class AssetConfigService {
 					m.put("label", rs.getString(3));
 					m.put("type", rs.getString(4));
 					m.put("required", rs.getBoolean(5));
-					m.put("options", rs.getString(6) == null ? List.of() : rs.getString(6));
+					m.put("options", options(rs.getString(6)));
 					return m;
 				}).list();
 	}
@@ -85,5 +88,18 @@ public class AssetConfigService {
 			throw new NotFoundException("There is no '" + kind + "' asset configuration (use hardware or software)");
 		}
 		return k;
+	}
+
+	/** A SELECT field's options are stored as a JSON array of strings. */
+	static List<String> options(String json) {
+		if (json == null || json.isBlank()) {
+			return List.of();
+		}
+		List<String> out = new java.util.ArrayList<>();
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"((?:[^\"\\\\]|\\\\.)*)\"").matcher(json);
+		while (m.find()) {
+			out.add(m.group(1).replace("\\\"", "\"").replace("\\\\", "\\"));
+		}
+		return out;
 	}
 }

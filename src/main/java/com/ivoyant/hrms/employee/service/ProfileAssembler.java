@@ -47,7 +47,7 @@ public class ProfileAssembler {
 	static final String AREA = EmployeeFields.AREA;
 	private static final List<String[]> TABS = List.of(new String[] {"overview", "Overview"}, new String[] {"personal", "Personal"},
 			new String[] {"bank", "Bank & statutory"}, new String[] {"leave", "Leave"}, new String[] {"compensation", "Compensation"},
-			new String[] {"documents", "Documents"}, new String[] {"other", "Additional details"});
+			new String[] {"documents", "Documents"}, new String[] {"assets", "Assets"}, new String[] {"other", "Additional details"});
 
 	private final EmployeeRepository employees;
 	private final FieldConfig fieldConfig;
@@ -147,6 +147,7 @@ public class ProfileAssembler {
 				case "leave" -> seesLeave;
 				case "compensation" -> seesComp || byTab.containsKey("compensation");
 				case "documents" -> seesDocs;
+				case "assets" -> self || access.has("assets", "VIEW");
 				default -> byTab.containsKey(t[0]);
 			};
 			if (show) {
