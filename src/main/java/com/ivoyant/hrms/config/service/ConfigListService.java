@@ -420,6 +420,8 @@ public class ConfigListService {
 			}
 			case "color", "icon":
 				return col.options().contains(s) ? null : "is not one of the choices";
+			case "hex":
+				return s.isEmpty() || s.matches("^#[0-9A-Fa-f]{6}$") ? null : "must be a colour like #1D4ED8";
 			case "select":
 				if (col.ref() != null) {
 					return refProblem(col, s, known, lookup);

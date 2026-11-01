@@ -44,7 +44,7 @@ public class AssetConfigService {
 		String k = kind(kind);
 		boolean hw = "HARDWARE".equals(k);
 		Map<String, Object> out = new LinkedHashMap<>();
-		out.put("statuses", rows("select id, name, color, assignable from asset_status where org_id = :org and kind = :kind and active order by sort, name", k));
+		out.put("statuses", rows("select id, name, color, color_hex as \"colorHex\", assignable from asset_status where org_id = :org and kind = :kind and active order by sort, name", k));
 		out.put("categories", rows("select id, name, icon from asset_category where org_id = :org and kind = :kind and active order by sort, name", k));
 		out.put("types", rows(hw
 				? "select id, name, category_id as \"categoryId\", icon, max_age_years as \"maxAgeYears\" from asset_type where org_id = :org and kind = :kind and active order by sort, name"

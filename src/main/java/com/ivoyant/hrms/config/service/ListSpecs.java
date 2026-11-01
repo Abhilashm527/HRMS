@@ -135,7 +135,7 @@ public final class ListSpecs {
 	}
 
 	private static Spec statuses() {
-		return spec("statuses", "Statuses", text("name", "Name").req(), color("color", "Colour"),
+		return spec("statuses", "Statuses", text("name", "Name").req(), color("color", "Colour"), hex("colorHex", "Custom colour"),
 				toggle("assignable", "Assignable"), toggle("active", "Active"));
 	}
 
@@ -180,6 +180,11 @@ public final class ListSpecs {
 
 	private static Col color(String key, String label) {
 		return new Col(key, label, "color", COLORS, null, null, false, false);
+	}
+
+	/** A custom #RRGGBB colour that overrides the preset {@link #color} when set; the editor shows it inside the colour cell. */
+	private static Col hex(String key, String label) {
+		return new Col(key, label, "hex", List.of(), null, null, false, false);
 	}
 
 	private static Col icon(String key, String label) {

@@ -150,7 +150,7 @@ class AssetConfigLists {
 
 	private TableBackedList statuses(String module, String kind) {
 		return list(module, "statuses", 10, "asset_status", kind, "t.sort, t.name", "t.name",
-				List.of(Col.text("name", "name"), Col.integer("color", "color"), Col.bool("assignable", "assignable"), Col.bool("active", "active")),
+				List.of(Col.text("name", "name"), Col.integer("color", "color"), Col.text("colorHex", "color_hex"), Col.bool("assignable", "assignable"), Col.bool("active", "active")),
 				(rows, all, errors) -> {
 					uniqueNames("statuses", rows, errors);
 					boolean ok = rows.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("assignable")) && !Boolean.FALSE.equals(r.get("active")));
