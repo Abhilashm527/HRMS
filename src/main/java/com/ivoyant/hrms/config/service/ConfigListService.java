@@ -2,7 +2,6 @@ package com.ivoyant.hrms.config.service;
 
 import com.ivoyant.hrms.common.audit.Audit;
 import com.ivoyant.hrms.common.authz.AuthzService;
-import com.ivoyant.hrms.common.authz.FgaTuples;
 import com.ivoyant.hrms.common.event.ConfigListsChangedEvent;
 import com.ivoyant.hrms.common.forms.TableBackedList;
 import com.ivoyant.hrms.common.security.CurrentUser;
@@ -546,7 +545,7 @@ public class ConfigListService {
 			throw new NotFoundException("Unknown settings module '" + module + "'");
 		}
 		String area = "onboarding".equals(module) ? "onboarding" : "assets";
-		if (!authz.can("can_configure", FgaTuples.configArea(area))) {
+		if (!authz.canConfigure(area)) {
 			throw new ForbiddenException("You cannot change the " + module + " settings");
 		}
 	}

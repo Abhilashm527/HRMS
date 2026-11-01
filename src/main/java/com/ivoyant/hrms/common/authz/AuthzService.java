@@ -120,6 +120,28 @@ public class AuthzService {
 		return active || can("member", FgaTuples.org(org));
 	}
 
+	/**
+	 * Can the caller change a configuration area? Super admins, the area's named owners and holders of its owner roles can. The
+	 * database holds these first-hand (OpenFGA gets a copy), so it is asked first; OpenFGA only when the database says no.
+	 */
+	public boolean canConfigure(String areaKey) {
+		UUID employeeId = currentUser.employeeId();
+		if (employeeId == null) {
+			return false;
+		}
+		UUID org = currentUser.orgId();
+		boolean owner = memberCache.get("cfg|" + employeeId + "|" + org + "|" + areaKey, k -> jdbc.sql("""
+				select count(*) from app_user u
+				 where u.employee_id = :e and u.org_id = :o and u.status = 'ACTIVE' and (
+				       exists (select 1 from user_role ur join role r on r.id = ur.role_id
+				                where ur.user_id = u.id and ur.scope = 'ORGANIZATION' and r.key = 'super_admin')
+				    or exists (select 1 from area_owner ao where ao.user_id = u.id and ao.area_key = :a)
+				    or exists (select 1 from user_role ur join area_owner_role aor on aor.role_id = ur.role_id
+				                where ur.user_id = u.id and aor.area_key = :a and aor.org_id = :o))""")
+				.param("e", employeeId).param("o", org).param("a", areaKey).query(Long.class).single() > 0);
+		return owner || can("can_configure", FgaTuples.configArea(areaKey));
+	}
+
 	// ---- raw operations ----
 
 	public boolean check(String user, String relation, String object) {

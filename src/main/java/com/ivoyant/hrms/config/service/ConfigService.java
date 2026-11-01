@@ -765,7 +765,7 @@ public class ConfigService {
 	}
 
 	public boolean canConfigure(String areaKey) {
-		return authz.can("can_configure", FgaTuples.configArea(ownerAreaOf(areaKey)));
+		return authz.canConfigure(ownerAreaOf(areaKey));
 	}
 
 	/** Who may configure an area: the asset areas follow Assets; custom fields on departments, positions and titles follow Onboarding. */
