@@ -9,6 +9,7 @@ import com.ivoyant.hrms.common.web.ErrorItem;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -68,7 +69,7 @@ class AssetConfigLists {
 						Col.bool("returnReq", "return_required"), Col.bool("active", "active")),
 				(rows, all, errors) -> {
 					uniqueNames("ownership", rows, errors);
-					formatsPerOwnership(rows, all.getOrDefault("idformat", List.of()), errors);
+					formatsPerOwnership(rows, renamed(rows, all.getOrDefault("idformat", List.of())), errors);
 				});
 	}
 
@@ -105,7 +106,59 @@ class AssetConfigLists {
 				List.of(Col.sql("name", "ownership_id", "(select o.name from asset_ownership o where o.id = t.ownership_id)",
 						"(select o.id from asset_ownership o where o.org_id = :org and lower(o.name) = lower(cast(:name as text)) limit 1)"),
 						Col.text("fmt", "fmt"), Col.bool("active", "active")),
-				(rows, all, errors) -> formatsPerOwnership(all.getOrDefault("ownership", List.of()), rows, errors));
+				(rows, all, errors) -> {
+					List<Map<String, Object>> owners = all.getOrDefault("ownership", List.of());
+					known("idformat", rows, owners, "Ownership", errors);
+					formatsPerOwnership(owners, rows, errors);
+				});
+	}
+
+	/**
+	 * ID formats point at their ownership by id but show its name. When an ownership is renamed in this save, its formats
+	 * still carry the old name, so read them under the new one before checking that every ownership has a format.
+	 */
+	private List<Map<String, Object>> renamed(List<Map<String, Object>> owners, List<Map<String, Object>> formats) {
+		Map<String, String> oldToNew = new HashMap<>();
+		for (Map<String, Object> o : owners) {
+			if (o.get("id") == null || blank(o.get("name"))) {
+				continue;
+			}
+			jdbc.sql("select name from asset_ownership where id = cast(:id as uuid) and org_id = :org").param("id", o.get("id").toString())
+					.param("org", user.orgId()).query(String.class).optional()
+					.filter(old -> !old.equalsIgnoreCase(o.get("name").toString().trim()))
+					.ifPresent(old -> oldToNew.put(old.toLowerCase(Locale.ROOT), o.get("name").toString().trim()));
+		}
+		if (oldToNew.isEmpty()) {
+			return formats;
+		}
+		List<Map<String, Object>> out = new ArrayList<>();
+		for (Map<String, Object> f : formats) {
+			String now = f.get("name") == null ? null : oldToNew.get(f.get("name").toString().toLowerCase(Locale.ROOT));
+			if (now == null) {
+				out.add(f);
+			} else {
+				Map<String, Object> copy = new HashMap<>(f);
+				copy.put("name", now);
+				out.add(copy);
+			}
+		}
+		return out;
+	}
+
+	/** Each row's name must be one of the referenced list's names, or the link is saved empty. */
+	private static void known(String listKey, List<Map<String, Object>> rows, List<Map<String, Object>> refs, String what, List<ErrorItem> errors) {
+		Set<String> names = new HashSet<>();
+		refs.forEach(r -> {
+			if (!blank(r.get("name"))) {
+				names.add(r.get("name").toString().trim().toLowerCase(Locale.ROOT));
+			}
+		});
+		for (int i = 0; i < rows.size(); i++) {
+			Object n = rows.get(i).get("name");
+			if (!blank(n) && !names.contains(n.toString().trim().toLowerCase(Locale.ROOT))) {
+				errors.add(ErrorItem.cell(listKey, i, "name", "UNKNOWN: " + what + " " + n + " doesn't exist"));
+			}
+		}
 	}
 
 	@Bean
@@ -138,7 +191,7 @@ class AssetConfigLists {
 				List.of(Col.sql("name", "license_type_id", "(select a.name from asset_type a where a.id = t.license_type_id)",
 						"(select a.id from asset_type a where a.org_id = :org and a.kind = 'SOFTWARE' and lower(a.name) = lower(cast(:name as text)) limit 1)"),
 						Col.text("fmt", "fmt"), Col.bool("active", "active")),
-				null);
+				(rows, all, errors) -> known("idformat", rows, all.getOrDefault("types", List.of()), "Licence type", errors));
 	}
 
 	@Bean

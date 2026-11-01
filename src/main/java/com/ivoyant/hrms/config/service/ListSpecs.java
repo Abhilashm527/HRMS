@@ -115,7 +115,7 @@ public final class ListSpecs {
 				spec("types", "Types", text("name", "Name").req(),
 						select("billing", "Billing", "Monthly", "Annual", "One-time", "Free"),
 						select("unit", "Unit", "Per seat", "Per device", "Site-wide"), toggle("active", "Active")),
-				spec("idformat", "ID format", text("name", "Licence type").req(), mono("fmt", "Format").req(),
+				spec("idformat", "ID format", ref("name", "Licence type", "types", "name").req(), mono("fmt", "Format").req(),
 						toggle("active", "Active")),
 				spec("fields", "Fields", ref("scope", "Category", "categories", "name"), text("name", "Name").req(),
 						select("ftype", "Type", "Text", "Number", "Date", "Dropdown", "Yes / No"), text("opts", "Options"),

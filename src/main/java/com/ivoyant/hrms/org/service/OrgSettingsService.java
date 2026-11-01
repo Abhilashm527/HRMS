@@ -253,10 +253,6 @@ public class OrgSettingsService {
 
 	private void guard(OrgSettingsRow row, List<String> changed, boolean force, List<String> warnings) {
 		UUID org = currentUser.orgId();
-		if (changed.contains("pwPolicy") && !"ENTRA".equals(row.getPwPolicy())) {
-			throw new UnprocessableException(List.of(ErrorItem.field("pwPolicy", "NOT_SUPPORTED",
-					"Passwords are managed by Entra ID until local sign-in exists")));
-		}
 		if (changed.contains("nested") && !row.isNestedDepts()) {
 			List<String> nested = names("select name from department where org_id = :org and parent_id is not null order by name", org);
 			if (!nested.isEmpty()) {

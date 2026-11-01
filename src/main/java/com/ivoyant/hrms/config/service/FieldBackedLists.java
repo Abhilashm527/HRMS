@@ -6,6 +6,7 @@ import com.ivoyant.hrms.config.domain.ConfigField;
 import com.ivoyant.hrms.config.domain.ConfigSection;
 import com.ivoyant.hrms.config.dto.CreateFieldRequest;
 import com.ivoyant.hrms.config.dto.CreateSectionRequest;
+import com.ivoyant.hrms.common.web.ConflictException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -327,6 +328,16 @@ class FieldBackedLists {
 				Map<String, Object> patch = patchOf(current, row);
 				if (validator != null) {
 					patch.remove("type");
+				}
+				// A new section name moves the field there (creating the section, shown in the portal, if needed).
+				String wantedSection = str(row.get("section"));
+				String currentSection = catalog.sections(PROFILE).stream().filter(x -> x.getId().equals(current.getSectionId()))
+						.map(ConfigSection::getName).findFirst().orElse("");
+				if (!wantedSection.isBlank() && !wantedSection.equalsIgnoreCase(currentSection)) {
+					if (current.isSystem()) {
+						throw new ConflictException(current.getLabel() + " is built in and stays in " + currentSection);
+					}
+					patch.put("sectionId", portalSection(wantedSection).toString());
 				}
 				config.updateField(id, patch, true, null);
 			}
