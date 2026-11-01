@@ -329,6 +329,24 @@ public class HireService {
 		}
 		p.titleId = jdbc.sql("select id from job_title where org_id = :org and active and lower(name) = lower(:t) limit 1")
 				.param("org", currentUser.orgId()).param("t", p.title).query(UUID.class).optional().orElse(null);
+		// The title comes from Configuration → Titles and must suit the department (its own, a parent's, or any).
+		// A hire saved before titles were a list keeps its old text until someone changes it.
+		boolean unchanged = existing != null && p.title != null && p.title.equalsIgnoreCase(existing.title());
+		if (p.titleId != null) {
+			p.title = jdbc.sql("select name from job_title where id = :id").param("id", p.titleId).query(String.class).single();
+		}
+		if (p.title != null && !unchanged) {
+			if (p.titleId == null) {
+				throw new UnprocessableException(List.of(ErrorItem.field("title", "INVALID", "Choose a job title from the list")));
+			}
+			if (p.dept != null && jdbc.sql("""
+					with recursive up as (select id, parent_id from department where id = :d
+					  union all select d.id, d.parent_id from department d join up on d.id = up.parent_id)
+					select count(*) from job_title t where t.id = :t and (t.department_id is null or t.department_id in (select id from up))""")
+					.param("d", p.dept).param("t", p.titleId).query(Long.class).single() == 0) {
+				throw new UnprocessableException(List.of(ErrorItem.field("title", "INVALID", p.title + " isn't a title in this department")));
+			}
+		}
 		return p;
 	}
 
