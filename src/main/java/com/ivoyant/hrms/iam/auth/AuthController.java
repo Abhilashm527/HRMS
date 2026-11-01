@@ -162,7 +162,16 @@ public class AuthController {
 
 	private void requireSameOrigin(HttpServletRequest request) {
 		String origin = request.getHeader(HttpHeaders.ORIGIN);
-		if (origin != null && !props.local() && !origin.equals(props.appBaseUrl()) && !origin.equals(props.issuer())) {
+		if (origin == null || props.local()) {
+			return;
+		}
+		// Browsers set Sec-Fetch-Site themselves (scripts cannot forge it); "same-origin" covers the
+		// web app calling through its /api rewrite even when APP_BASE_URL is not configured exactly.
+		if ("same-origin".equals(request.getHeader("Sec-Fetch-Site"))) {
+			return;
+		}
+		String o = origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin;
+		if (!o.equalsIgnoreCase(props.appBaseUrl()) && !o.equalsIgnoreCase(props.issuer())) {
 			throw new StatusException(HttpStatus.FORBIDDEN, "BAD_ORIGIN", "This request did not come from the app");
 		}
 	}
