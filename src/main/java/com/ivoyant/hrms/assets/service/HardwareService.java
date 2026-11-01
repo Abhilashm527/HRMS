@@ -266,15 +266,38 @@ public class HardwareService {
 				}).single();
 		long total = (Long) totals.get("total");
 		long assigned = (Long) totals.get("assigned");
+		List<Map<String, Object>> types = jdbc.sql("""
+				select t.name, count(*) as total, count(ag.id) as assigned, coalesce(sum(a.purchase_cost), 0) as value
+				  from asset a join asset_type t on t.id = a.type_id join asset_status s on s.id = a.status_id
+				  left join asset_assignment ag on ag.asset_id = a.id and ag.returned_on is null
+				 where a.org_id = :org and a.deleted_at is null and coalesce(s.system_key, '') <> 'RETIRED'
+				 group by t.id, t.name order by count(*) desc, t.name""").param("org", org).query((rs, i) -> {
+					Map<String, Object> m = new LinkedHashMap<>();
+					m.put("label", rs.getString(1));
+					m.put("total", rs.getLong(2));
+					m.put("assigned", rs.getLong(3));
+					if (canSeeMoney()) {
+						m.put("value", rs.getLong(4));
+					}
+					return m;
+				}).list();
+		long repair = jdbc.sql("select count(*) from asset a join asset_status s on s.id = a.status_id where a.org_id = :org and a.deleted_at is null and s.system_key = 'IN_REPAIR'")
+				.param("org", org).query(Long.class).single();
+		long ending = jdbc.sql("""
+				select count(*) from asset a join asset_status s on s.id = a.status_id
+				 where a.org_id = :org and a.deleted_at is null and coalesce(s.system_key, '') <> 'RETIRED' and a.warranty_until between :t and :soon""")
+				.param("org", org).param("t", today).param("soon", today.plusDays(90)).query(Long.class).single();
+		String perType = String.join(" · ", types.stream().limit(3).map(t -> t.get("total") + " " + plural(String.valueOf(t.get("label")).toLowerCase(Locale.ROOT), (Long) t.get("total"))).toList());
 		List<Map<String, Object>> kpis = new ArrayList<>();
-		kpis.add(kpi("total", "Total hardware", total, totals.get("cats") + " categories · " + totals.get("locs") + " locations"));
-		kpis.add(kpi("assigned", "Assigned", assigned, (total == 0 ? 0 : Math.round(100.0 * assigned / total)) + "% allocation"));
-		kpis.add(kpi("stock", "In stock", totals.get("stock"), totals.get("stockEnding") + " ending warranty"));
+		kpis.add(kpi("total", "Total hardware", total, perType.isEmpty() ? "Nothing recorded yet" : perType, "muted"));
+		kpis.add(kpi("assigned", "Assigned", assigned + " / " + total, totals.get("stock") + " in stock · " + repair + " in repair", "success"));
 		if (canSeeMoney()) {
-			kpis.add(kpi("value", "Asset value", totals.get("value"), "book value at cost"));
+			kpis.add(kpi("value", "Asset value", totals.get("value"), "At purchase cost", "muted"));
 		}
+		kpis.add(kpi("warranty", "Warranty expiring", ending, "In the next 90 days", "warning"));
 		Map<String, Object> out = new LinkedHashMap<>();
 		out.put("kpis", kpis);
+		out.put("types", types);
 		out.put("byStatus", jdbc.sql("select s.name, s.color, count(*) from asset a join asset_status s on s.id = a.status_id where a.org_id = :org and a.deleted_at is null group by s.id, s.name, s.color, s.sort order by s.sort")
 				.param("org", org).query((rs, i) -> Map.<String, Object>of("label", rs.getString(1), "color", rs.getInt(2), "n", rs.getLong(3))).list());
 		out.put("byType", jdbc.sql("select t.name, count(*) from asset a join asset_type t on t.id = a.type_id join asset_status s on s.id = a.status_id where a.org_id = :org and a.deleted_at is null and coalesce(s.system_key, '') <> 'RETIRED' group by t.id, t.name order by count(*) desc, t.name")
@@ -303,7 +326,13 @@ public class HardwareService {
 	}
 
 	static Map<String, Object> kpi(String key, String label, Object value, String sub) {
+		return kpi(key, label, value, sub, "muted");
+	}
+
+	/** {@code tone}: muted, success or warning — the colour of the sub line. */
+	static Map<String, Object> kpi(String key, String label, Object value, String sub, String tone) {
 		Map<String, Object> m = new LinkedHashMap<>();
+		m.put("tone", tone);
 		m.put("key", key);
 		m.put("label", label);
 		m.put("value", value);
@@ -469,6 +498,10 @@ public class HardwareService {
 			return d.toLocalDate();
 		}
 		return (LocalDate) o;
+	}
+
+	static String plural(String word, long n) {
+		return n == 1 ? word : word.endsWith("s") ? word : word + "s";
 	}
 
 	// ================================================================== timeline

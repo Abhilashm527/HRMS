@@ -283,7 +283,8 @@ public class LicenseService {
 	@Transactional
 	public Map<String, Object> dashboard(UUID categoryId) {
 		int[] th = thresholds();
-		List<Lic> scope = all().stream().filter(l -> categoryId == null || categoryId.equals(l.categoryId())).toList();
+		List<Lic> all = all();
+		List<Lic> scope = all;
 		LocalDate today = support.today();
 		long totalSeats = scope.stream().filter(l -> !l.siteWide()).mapToLong(Lic::seats).sum();
 		long usedSeats = scope.stream().filter(l -> !l.siteWide()).mapToLong(Lic::used).sum();
@@ -294,11 +295,11 @@ public class LicenseService {
 		boolean withMoney = money();
 		List<Map<String, Object>> kpis = new ArrayList<>();
 		kpis.add(HardwareService.kpi("total", "Total software assets", scope.size(), cats + " categories · " + owners + " owners"));
-		kpis.add(HardwareService.kpi("assigned", "Assigned licenses", usedSeats + " / " + totalSeats, (totalSeats == 0 ? 0 : Math.round(100.0 * usedSeats / totalSeats)) + "% utilisation"));
+		kpis.add(HardwareService.kpi("assigned", "Assigned licenses", usedSeats + " / " + totalSeats, (totalSeats == 0 ? 0 : Math.round(100.0 * usedSeats / totalSeats)) + "% utilisation", "success"));
 		if (withMoney) {
 			kpis.add(HardwareService.kpi("cost", "Annual cost", annual, annual / 12 + " per month"));
 		}
-		kpis.add(HardwareService.kpi("renewals", "Renewals due", renewals, "in the next " + th[0] + " days"));
+		kpis.add(HardwareService.kpi("renewals", "Expiring soon", renewals, "Renewals in next " + th[0] + " days", "warning"));
 		Map<String, Object> out = new LinkedHashMap<>();
 		out.put("kpis", kpis);
 		Map<String, Long> byCat = scope.stream().collect(Collectors.groupingBy(Lic::categoryName, LinkedHashMap::new, Collectors.counting()));
@@ -307,7 +308,27 @@ public class LicenseService {
 		out.put("byType", byType.entrySet().stream().map(e -> Map.<String, Object>of("label", e.getKey(), "n", e.getValue())).toList());
 		Map<String, Long> byState = scope.stream().collect(Collectors.groupingBy(l -> (String) state(l, th).get("label"), LinkedHashMap::new, Collectors.counting()));
 		out.put("byState", byState.entrySet().stream().map(e -> Map.<String, Object>of("label", e.getKey(), "n", e.getValue())).toList());
-		out.put("usage", usage(categoryId));
+		out.put("usage", usage(null));
+		// "License usage by category": the licences of one category (the one asked for, else the biggest) with seats used
+		UUID cat = categoryId != null ? categoryId : all.stream().collect(Collectors.groupingBy(Lic::categoryId, Collectors.counting())).entrySet().stream()
+				.max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+		Map<String, Object> cu = new LinkedHashMap<>();
+		cu.put("categoryId", cat);
+		cu.put("category", all.stream().filter(l -> l.categoryId().equals(cat)).map(Lic::categoryName).findFirst().orElse(null));
+		cu.put("items", all.stream().filter(l -> l.categoryId().equals(cat)).map(l -> {
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("id", l.id());
+			m.put("name", l.name());
+			m.put("used", l.used());
+			m.put("seats", l.siteWide() ? null : l.seats());
+			return m;
+		}).toList());
+		out.put("categoryUsage", cu);
+		if (withMoney) {
+			Map<String, Long> spend = all.stream().collect(Collectors.groupingBy(Lic::categoryName, LinkedHashMap::new, Collectors.summingLong(Lic::annualCost)));
+			out.put("spendByCategory", spend.entrySet().stream().sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+					.map(e -> Map.<String, Object>of("label", e.getKey(), "annual", e.getValue())).toList());
+		}
 		List<Lic> underused = scope.stream().filter(l -> "UNDERUSED".equals(state(l, th).get("key"))).sorted(Comparator.comparingLong((Lic l) -> (l.seats() - l.used()) * l.perSeatAnnual()).reversed()).toList();
 		Map<String, Object> under = new LinkedHashMap<>();
 		if (withMoney) {
