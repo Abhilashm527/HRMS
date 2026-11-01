@@ -107,7 +107,7 @@ public class UserService {
 			fga.write(FgaTuples.orgRole(user.getOrgId(), user.getEmployeeId(), role.getRoleKey()));
 		}
 		UserRoleResponse response = toResponse(ur, role);
-		audit.created("iam", "UserRole", ur.getId(), response);
+		audit.created("iam", "UserRole", ur.getId(), auditView(user, response));
 		return response;
 	}
 
@@ -127,7 +127,7 @@ public class UserService {
 		if (userRoles.findByUserId(userId).stream().noneMatch(other -> other.getRoleId().equals(role.getId()))) {
 			fga.delete(FgaTuples.roleMember(user.getEmployeeId(), role.getRoleKey()));
 		}
-		audit.deleted("iam", "UserRole", userRoleId, before);
+		audit.deleted("iam", "UserRole", userRoleId, auditView(user, before));
 	}
 
 	private static boolean isOrgWideAdmin(Role role, Scope scope) {
@@ -142,5 +142,18 @@ public class UserService {
 	private AppUser find(UUID id) {
 		return users.findByIdAndOrgId(id, currentUser.orgId())
 				.orElseThrow(() -> new NotFoundException("User " + id + " not found"));
+	}
+
+	/** The assignment plus whose it is, so the access audit log can name the person. */
+	private static java.util.Map<String, Object> auditView(AppUser user, UserRoleResponse r) {
+		java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+		m.put("userId", user.getId());
+		m.put("employeeId", user.getEmployeeId());
+		m.put("roleId", r.roleId());
+		m.put("roleKey", r.roleKey());
+		m.put("roleName", r.roleName());
+		m.put("scope", r.scope());
+		m.put("scopeRef", r.scopeRef());
+		return m;
 	}
 }

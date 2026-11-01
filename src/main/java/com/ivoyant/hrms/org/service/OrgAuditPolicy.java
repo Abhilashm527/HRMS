@@ -13,8 +13,8 @@ import org.springframework.stereotype.Component;
 @Component
 class OrgAuditPolicy implements AuditPolicy {
 
-	private static final Set<String> PERMISSION = Set.of("Role", "RolePermissions", "UserRole", "AreaOwner", "Delegation");
-	private static final Set<String> DEFINITIONS = Set.of("Role", "RolePermissions");
+	private static final Set<String> PERMISSION = Set.of("Role", "RolePermissions", "RoleNavigation", "UserRole", "AreaOwner", "Delegation");
+	private static final Set<String> DEFINITIONS = Set.of("Role", "RolePermissions", "RoleNavigation");
 
 	private final OrgSettings settings;
 

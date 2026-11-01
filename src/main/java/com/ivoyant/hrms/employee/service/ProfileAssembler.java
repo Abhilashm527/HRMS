@@ -64,11 +64,14 @@ public class ProfileAssembler {
 	private final CompensationView compensation;
 	private final LeaveTab leaveTab;
 	private final com.ivoyant.hrms.common.audit.Audit audit;
+	private final com.ivoyant.hrms.iam.NavAccess nav;
 
 	ProfileAssembler(EmployeeRepository employees, FieldConfig fieldConfig, EmployeeRecords records, CurrentUser currentUser,
 			EmployeeActions actions, ModuleAccess access, AuthzService authz, OrgDirectory org, Positions positions, Titles titles,
-			IamDirectory iam, JdbcClient jdbc, CompensationView compensation, LeaveTab leaveTab, com.ivoyant.hrms.common.audit.Audit audit) {
+			IamDirectory iam, JdbcClient jdbc, CompensationView compensation, LeaveTab leaveTab, com.ivoyant.hrms.common.audit.Audit audit,
+			com.ivoyant.hrms.iam.NavAccess nav) {
 		this.audit = audit;
+		this.nav = nav;
 		this.employees = employees;
 		this.fieldConfig = fieldConfig;
 		this.records = records;
@@ -115,8 +118,13 @@ public class ProfileAssembler {
 			sections.add(sec);
 			byTab.computeIfAbsent("overview", k -> new ArrayList<>()).add(sec);
 		}
+		// Module permissions can switch tabs off for every role a person holds; their own profile is not affected.
+		java.util.Set<String> hiddenTabs = self ? java.util.Set.of() : nav.hiddenProfileTabs();
 		for (FormSection s : form.sections()) {
 			String tab = tabOf(s.name());
+			if (hiddenTabs.contains(tab)) {
+				continue;
+			}
 			List<Map<String, Object>> fields = new ArrayList<>();
 			for (FormField f : s.fields()) {
 				if (f.type() == FieldType.HEADING) {
@@ -142,6 +150,9 @@ public class ProfileAssembler {
 		boolean seesDocs = self || access.has("employee", "VIEW");
 		List<Map<String, String>> tabs = new ArrayList<>();
 		for (String[] t : TABS) {
+			if (hiddenTabs.contains(t[0])) {
+				continue;
+			}
 			boolean show = switch (t[0]) {
 				case "overview" -> true;
 				case "leave" -> seesLeave;
@@ -192,10 +203,10 @@ public class ProfileAssembler {
 		out.put("sections", onlyTab == null ? sections : sections.stream().filter(s -> onlyTab.equals(s.get("tab"))).toList());
 		out.put("hiddenSections", hiddenSections(levels, defs));
 		out.put("viewerRoles", iam.effectiveRoles(me, "employee").stream().map(RoleRef::name).sorted().toList());
-		if (seesLeave && (onlyTab == null || "leave".equals(onlyTab))) {
+		if (seesLeave && !hiddenTabs.contains("leave") && (onlyTab == null || "leave".equals(onlyTab))) {
 			out.put("leave", leaveTab.forEmployee(id, java.time.Year.now().getValue(), self || access.has("leave", "EDIT")));
 		}
-		if ((seesComp || byTab.containsKey("compensation")) && (onlyTab == null || "compensation".equals(onlyTab))) {
+		if ((seesComp || byTab.containsKey("compensation")) && !hiddenTabs.contains("compensation") && (onlyTab == null || "compensation".equals(onlyTab))) {
 			out.put("compensation", compensation(e, ctcLevel));
 		}
 		if (onlyTab == null) {
