@@ -112,6 +112,9 @@ public class TokenService {
 		return raw;
 	}
 
+	/** How long after a refresh token is spent it may still be presented (parallel tabs, lost responses) without ending the session. */
+	static final java.time.Duration REUSE_GRACE = java.time.Duration.ofSeconds(60);
+
 	/** Rotates a refresh token. A token that was already used means it leaked: the whole session is ended. */
 	@Transactional(noRollbackFor = StatusException.class)
 	Issued refresh(String raw, String userAgent, String ip) {
@@ -144,7 +147,11 @@ public class TokenService {
 			throw unauthorized("SESSION_REVOKED", "You were signed out");
 		}
 		int claimed = jdbc.sql("update auth_refresh_token set used_at = now() where token_hash = :h and used_at is null").param("h", AuthCrypto.hash(raw)).update();
-		if (claimed == 0) {
+		// Several tabs, or a refresh whose answer never reached the browser (tab closed or reloaded mid-request), can present a token
+		// that was spent moments ago. Within a short grace period that is not theft: rotate again instead of ending the session.
+		boolean concurrent = claimed == 0 && jdbc.sql("select count(*) from auth_refresh_token where token_hash = :h and used_at > now() - make_interval(secs => :g)")
+				.param("h", AuthCrypto.hash(raw)).param("g", REUSE_GRACE.toSeconds()).query(Long.class).single() > 0;
+		if (claimed == 0 && !concurrent) {
 			revoke(sid, "REFRESH_REUSE");
 			audit.log("REFRESH_REUSE", (UUID) t.get("emp"), user.toString(), Map.of("session", sid.toString()));
 			throw unauthorized("SESSION_REVOKED", "You were signed out for your security. Sign in again.");

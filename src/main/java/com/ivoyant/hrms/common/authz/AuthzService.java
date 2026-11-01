@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -41,12 +42,19 @@ public class AuthzService {
 			.expireAfterWrite(Duration.ofSeconds(45))
 			.maximumSize(10_000)
 			.build();
+	/** Whether an employee has an active account in an org; cached briefly so every request doesn't hit the database. */
+	private final Cache<String, Boolean> memberCache = Caffeine.newBuilder()
+			.expireAfterWrite(Duration.ofSeconds(60))
+			.maximumSize(10_000)
+			.build();
+	private final JdbcClient jdbc;
 	private volatile String storeId;
 	private volatile boolean freshStore;
 
-	public AuthzService(OpenFgaClient client, FgaProperties props, CurrentUser currentUser) {
+	public AuthzService(OpenFgaClient client, FgaProperties props, CurrentUser currentUser, JdbcClient jdbc) {
 		this.client = client;
 		this.currentUser = currentUser;
+		this.jdbc = jdbc;
 		this.storeId = props.configured() ? props.storeId() : null;
 	}
 
@@ -94,8 +102,22 @@ public class AuthzService {
 		return can("super_admin", FgaTuples.org(currentUser.orgId()));
 	}
 
+	/**
+	 * Is the caller a member of their org? Membership is having an active account there, which the database knows first-hand
+	 * (OpenFGA holds a copy written from it). Asking the database keeps every signed-in person working while OpenFGA is asleep,
+	 * restarting or still being synced; OpenFGA is asked only when the database says no.
+	 */
 	public boolean isMember() {
-		return can("member", FgaTuples.org(currentUser.orgId()));
+		UUID employeeId = currentUser.employeeId();
+		if (employeeId == null) {
+			return false;
+		}
+		UUID org = currentUser.orgId();
+		boolean active = memberCache.get(employeeId + "|" + org, k -> jdbc.sql("""
+				select count(*) from app_user u join employee e on e.id = u.employee_id
+				 where u.employee_id = :e and u.org_id = :o and u.status = 'ACTIVE' and e.status <> 'EXITED'""")
+				.param("e", employeeId).param("o", org).query(Long.class).single() > 0);
+		return active || can("member", FgaTuples.org(org));
 	}
 
 	// ---- raw operations ----
