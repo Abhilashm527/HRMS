@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * admins and HR admins change who a folder is open to.
  */
 @Service
-public class DocumentService {
+public class DocumentService implements com.ivoyant.hrms.documents.DocumentSearch {
 
 	public enum Access {
 		ADMINS("All admins"), HR("HR only"), FINANCE("Finance only"), IT("IT only"), EMPLOYEES("All employees");
@@ -187,6 +187,35 @@ public class DocumentService {
 			files(c, under, null).stream().filter(m -> matches((String) m.get("name"), needle)).forEach(out::add);
 		}
 		return Map.of("items", out);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Map<String, Object>> search(String q, int limit) {
+		String needle = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+		if (needle.length() < 2) {
+			return List.of();
+		}
+		Map<UUID, Folder> folders = loadFolders();
+		if (folders.isEmpty()) {
+			return List.of();
+		}
+		Ctx c = ctxFor(folders);
+		List<Map<String, Object>> out = new ArrayList<>();
+		for (Folder f : folders.values()) {
+			if (f.parent() != null && c.sees(f.id()) && f.name().toLowerCase(Locale.ROOT).contains(needle)) {
+				out.add(Map.of("id", f.id(), "kind", "FOLDER", "name", f.name(), "where", c.path(c.visibleParent(f.id())), "folderId", f.id()));
+			}
+		}
+		jdbc.sql("select id, name, folder_id from doc_file where org_id = :org and lower(name) like :q order by updated_at desc limit 200").param("org", org())
+				.param("q", "%" + needle + "%").query((rs, i) -> {
+					UUID folder = rs.getObject(3, UUID.class);
+					if (c.sees(folder)) {
+						out.add(Map.of("id", rs.getObject(1, UUID.class), "kind", "FILE", "name", rs.getString(2), "where", c.path(folder), "folderId", folder));
+					}
+					return 0;
+				}).list();
+		return out.size() > limit ? out.subList(0, limit) : out;
 	}
 
 	@Transactional
@@ -624,6 +653,10 @@ public class DocumentService {
 			seed();
 			folders = loadFolders();
 		}
+		return ctxFor(folders);
+	}
+
+	private Ctx ctxFor(Map<UUID, Folder> folders) {
 		UUID me = currentUser.employeeId();
 		Set<String> keys = new HashSet<>();
 		if (me != null) {

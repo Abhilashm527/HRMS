@@ -25,7 +25,7 @@ public class EssOnboardingService {
 		TASKS.put("docs", new String[] {"Upload joining documents", "Anything HR still needs from you", null});
 		TASKS.put("offer", new String[] {"Sign offer letter & NDA", "Sign the documents HR sent you", null});
 		TASKS.put("profile", new String[] {"Complete your profile", "Fill in the required details", "/me/profile"});
-		TASKS.put("policies", new String[] {"Read and acknowledge policies", "Company policies you need to acknowledge", "/policies"});
+		TASKS.put("policies", new String[] {"Read and acknowledge policies", "Company policies you need to acknowledge", "/me/policies"});
 		TASKS.put("laptop", new String[] {"Collect your laptop", "From the IT desk at your location", null});
 		TASKS.put("m365", new String[] {"Sign in to Microsoft 365 & Slack", "Use your work email and set a new password", null});
 		TASKS.put("buddy", new String[] {"Meet your onboarding buddy", "Your buddy helps you settle in", null});
@@ -53,6 +53,9 @@ public class EssOnboardingService {
 		Map<String, Object> out = new LinkedHashMap<>();
 		boolean visible = doj != null && !doj.isBefore(status.today().minusDays(90));
 		out.put("visible", visible);
+		out.put("joiningDate", doj);
+		out.put("manager", jdbc.sql("select m.display_name from employee e join employee m on m.id = e.manager_id where e.id = :id").param("id", me)
+				.query(String.class).optional().orElse(null));
 		if (!visible) {
 			out.put("tasks", List.of());
 			out.put("left", 0);
@@ -88,7 +91,14 @@ public class EssOnboardingService {
 	private boolean autoDone(String key, UUID me) {
 		return switch (key) {
 			case "profile" -> employees.missingRequired(me).isEmpty();
-			default -> true; // policies: nothing to acknowledge until the policy module exists
+			// every published policy that asks for acknowledgement has been acknowledged in its latest asking version
+			default -> jdbc.sql("""
+					select count(*) from policy p
+					where p.org_id = :org and p.archived_at is null and p.ack_required
+					  and exists (select 1 from policy_version v where v.policy_id = p.id and v.requires_ack)
+					  and not exists (select 1 from policy_ack k where k.employee_id = :e and k.version_id =
+					        (select v.id from policy_version v where v.policy_id = p.id and v.requires_ack order by v.published_at desc limit 1))""")
+					.param("org", currentUser.orgId()).param("e", me).query(Long.class).single() == 0;
 		};
 	}
 

@@ -24,9 +24,11 @@ import com.ivoyant.hrms.common.authz.RequiresMember;
 public class AttendanceController {
 
 	private final AttendanceService attendance;
+	private final com.ivoyant.hrms.attendance.service.TimesheetService timesheets;
 
-	public AttendanceController(AttendanceService attendance) {
+	public AttendanceController(AttendanceService attendance, com.ivoyant.hrms.attendance.service.TimesheetService timesheets) {
 		this.attendance = attendance;
+		this.timesheets = timesheets;
 	}
 
 	@GetMapping("/board")
@@ -60,5 +62,61 @@ public class AttendanceController {
 	@PutMapping("/{employeeId}/{day}")
 	public Map<String, Object> correct(@PathVariable UUID employeeId, @PathVariable LocalDate day, @RequestBody Map<String, Object> body) {
 		return attendance.correct(employeeId, day, body);
+	}
+
+	// ---- self service: my days, asking to fix one, timesheets
+
+	@GetMapping("/me/log")
+	public Map<String, Object> myLog(@RequestParam(defaultValue = "30") int days) {
+		return attendance.myLog(days);
+	}
+
+	/** {@code {day, in, out, wfh, reason}} */
+	@PostMapping("/regularisations")
+	public Map<String, Object> regularise(@RequestBody Map<String, Object> body) {
+		return attendance.regularise(body);
+	}
+
+	@GetMapping("/regularisations")
+	public Map<String, Object> regularisations(@RequestParam(required = false) String status) {
+		return attendance.regularisations(status);
+	}
+
+	@PostMapping("/regularisations/{id}/cancel")
+	public void cancelRegularisation(@PathVariable UUID id) {
+		attendance.cancelRegularisation(id);
+	}
+
+	/** {@code {approve, note}} */
+	@PostMapping("/regularisations/{id}/decide")
+	public Map<String, Object> decideRegularisation(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+		return attendance.decideRegularisation(id, Boolean.TRUE.equals(body.get("approve")), body.get("note") == null ? null : body.get("note").toString());
+	}
+
+	@GetMapping("/timesheet")
+	public Map<String, Object> timesheet(@RequestParam(required = false) LocalDate week) {
+		return timesheets.week(week);
+	}
+
+	/** {@code {rows: [{projectId, hours: [7]}]}} */
+	@PutMapping("/timesheet")
+	public Map<String, Object> saveTimesheet(@RequestParam LocalDate week, @RequestBody Map<String, Object> body) {
+		return timesheets.save(week, body);
+	}
+
+	@PostMapping("/timesheet/submit")
+	public Map<String, Object> submitTimesheet(@RequestParam LocalDate week) {
+		return timesheets.submit(week);
+	}
+
+	@GetMapping("/timesheets/pending")
+	public Map<String, Object> pendingTimesheets() {
+		return timesheets.pending();
+	}
+
+	/** {@code {approve, note}} */
+	@PostMapping("/timesheets/{id}/decide")
+	public Map<String, Object> decideTimesheet(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+		return timesheets.decide(id, Boolean.TRUE.equals(body.get("approve")), body.get("note") == null ? null : body.get("note").toString());
 	}
 }

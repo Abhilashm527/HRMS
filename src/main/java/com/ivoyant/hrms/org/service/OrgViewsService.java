@@ -214,4 +214,52 @@ public class OrgViewsService {
 					return m;
 				}).list();
 	}
+
+	/**
+	 * Everyone in the reporting tree (active, not archived) with who they report to, and the department tree with heads and
+	 * headcounts. Names, titles and departments only, so every employee may see it.
+	 */
+	@org.springframework.transaction.annotation.Transactional(readOnly = true)
+	public Map<String, Object> chart() {
+		UUID org = currentUser.orgId();
+		List<Map<String, Object>> people = jdbc.sql("""
+				select e.id, e.employee_code, e.display_name, e.first_name, e.last_name, jt.name, d.id, d.name, e.manager_id, e.photo_version, l.name
+				from employee e left join job_title jt on jt.id = e.title_id left join department d on d.id = e.department_id left join location l on l.id = e.location_id
+				where e.org_id = :org and e.archived_at is null and e.status <> 'EXITED' order by lower(e.display_name)""").param("org", org).query((rs, i) -> {
+			Map<String, Object> m = new java.util.LinkedHashMap<>();
+			UUID id = rs.getObject(1, UUID.class);
+			m.put("id", id);
+			m.put("code", rs.getString(2));
+			m.put("name", rs.getString(3));
+			String f = rs.getString(4);
+			String l = rs.getString(5);
+			m.put("initials", ((f == null || f.isBlank() ? "" : f.substring(0, 1)) + (l == null || l.isBlank() ? "" : l.substring(0, 1))).toUpperCase(java.util.Locale.ROOT));
+			m.put("title", rs.getString(6));
+			UUID dep = rs.getObject(7, UUID.class);
+			m.put("department", dep == null ? null : Map.of("id", dep, "name", rs.getString(8), "color", Math.floorMod(dep.hashCode(), 8)));
+			m.put("managerId", rs.getObject(9, UUID.class));
+			m.put("photoUrl", "/api/v1/employees/" + id + "/photo?s=64&v=" + rs.getInt(10));
+			m.put("location", rs.getString(11));
+			return m;
+		}).list();
+		List<Map<String, Object>> depts = jdbc.sql("""
+				select d.id, d.name, d.parent_id, h.id, h.display_name,
+				       (select count(*) from employee e where e.department_id = d.id and e.archived_at is null and e.status <> 'EXITED')
+				from department d left join employee h on h.id = d.head_employee_id where d.org_id = :org and d.active order by lower(d.name)""").param("org", org)
+				.query((rs, i) -> {
+					Map<String, Object> m = new java.util.LinkedHashMap<>();
+					m.put("id", rs.getObject(1, UUID.class));
+					m.put("name", rs.getString(2));
+					m.put("parentId", rs.getObject(3, UUID.class));
+					m.put("head", rs.getObject(4, UUID.class) == null ? null : Map.of("id", rs.getObject(4, UUID.class), "name", rs.getString(5)));
+					m.put("count", rs.getLong(6));
+					m.put("color", Math.floorMod(rs.getObject(1, UUID.class).hashCode(), 8));
+					return m;
+				}).list();
+		Map<String, Object> out = new java.util.LinkedHashMap<>();
+		out.put("people", people);
+		out.put("departments", depts);
+		out.put("canSeeGroups", access.has("org", "VIEW"));
+		return out;
+	}
 }

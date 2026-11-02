@@ -24,6 +24,13 @@ public class OrgViewsController {
 		this.views = views;
 	}
 
+	/** The reporting tree and departments; names, titles and departments only, so any employee may see it. */
+	@GetMapping("/chart")
+	@com.ivoyant.hrms.common.authz.RequiresMember
+	public Map<String, Object> chart() {
+		return views.chart();
+	}
+
 	@GetMapping("/teams-view")
 	@PreAuthorize(VIEW)
 	public List<Map<String, Object>> teams(@RequestParam(required = false) UUID departmentId) {
