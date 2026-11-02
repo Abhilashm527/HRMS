@@ -164,6 +164,12 @@ public class PolicyController {
 		return policies.read(id);
 	}
 
+	/** Reminds everyone who hasn't acknowledged the current version yet. */
+	@PostMapping("/{id}/remind")
+	public Map<String, Object> remind(@PathVariable UUID id) {
+		return policies.remind(id);
+	}
+
 	@PostMapping("/{id}/acknowledge")
 	public Map<String, Object> acknowledge(@PathVariable UUID id) {
 		return policies.acknowledge(id);

@@ -317,6 +317,27 @@ public class PolicyService {
 			jdbc.sql("update policy set review_cycle_months = :c where id = :id").param("c", cycle(body.get("cycleMonths"))).param("id", id).update();
 			changed.add("review cycle");
 		}
+		if (body.containsKey("appliesTo")) {
+			String a = str(body.get("appliesTo"));
+			a = a == null || a.isBlank() ? "All employees" : a.strip();
+			if (a.length() > 80) {
+				throw new UnprocessableException(List.of(ErrorItem.field("appliesTo", "TOO_LONG", "Keep it under 80 characters")));
+			}
+			jdbc.sql("update policy set applies_to = :a where id = :id").param("a", a).param("id", id).update();
+			changed.add("applies to");
+		}
+		if (body.get("page") instanceof Map<?, ?> pg) {
+			jdbc.sql("update policy set page = cast(:p as jsonb) where id = :id").param("p", json.writeValueAsString(pageOf(pg))).param("id", id).update();
+			changed.add("page layout");
+		}
+		if (body.containsKey("header")) {
+			jdbc.sql("update policy set header_html = :h where id = :id").param("h", PolicyHtml.cleanLine(str(body.get("header")))).param("id", id).update();
+			changed.add("header");
+		}
+		if (body.containsKey("footer")) {
+			jdbc.sql("update policy set footer_html = :h where id = :id").param("h", PolicyHtml.cleanLine(str(body.get("footer")))).param("id", id).update();
+			changed.add("footer");
+		}
 		if (body.containsKey("ackRequired")) {
 			jdbc.sql("update policy set ack_required = :a where id = :id").param("a", Boolean.TRUE.equals(body.get("ackRequired"))).param("id", id).update();
 			changed.add(Boolean.TRUE.equals(body.get("ackRequired")) ? "acknowledgement on" : "acknowledgement off");
@@ -499,7 +520,7 @@ public class PolicyService {
 				throw new ForbiddenException("Drafts are for HR only");
 			}
 			secs = sections(jdbc.sql("select sections::text from policy_draft where policy_id = :p").param("p", id).query(String.class).optional()
-					.orElseThrow(() -> new NotFoundException("No draft"))).stream().map(s -> new PolicyPdf.Section(s.heading(), s.body())).toList();
+					.orElseThrow(() -> new NotFoundException("No draft"))).stream().map(s -> new PolicyPdf.Section(s.heading(), pdfText(s.body()))).toList();
 			label = "Draft v" + nextVersion(currentVersion(id), false);
 		}
 		else {
@@ -514,13 +535,32 @@ public class PolicyService {
 					order by published_at desc limit 1""").param("p", id).param("v", version == null || version.isBlank() ? null : version, java.sql.Types.VARCHAR)
 					.query((rs, i) -> Map.<String, Object>of("v", rs.getString(1), "s", rs.getString(2), "at", rs.getObject(3, OffsetDateTime.class))).optional()
 					.orElseThrow(() -> new NotFoundException("This policy has no published version yet"));
-			secs = sections((String) v.get("s")).stream().map(s -> new PolicyPdf.Section(s.heading(), s.body())).toList();
+			secs = sections((String) v.get("s")).stream().map(s -> new PolicyPdf.Section(s.heading(), pdfText(s.body()))).toList();
 			label = "Version " + v.get("v") + " · effective " + DAY.format((OffsetDateTime) v.get("at"));
 		}
 		byte[] bytes = PolicyPdf.render((String) p.get("name"), label + " · " + ((Map<?, ?>) p.get("category")).get("name"), secs,
 				p.get("name") + " · " + label);
 		String file = ((String) p.get("name")).replaceAll("[^A-Za-z0-9 ._-]", "").trim() + ".pdf";
 		return new FileContent(bytes, "application/pdf", file.isBlank() ? "policy.pdf" : file);
+	}
+
+	/** Sends an in-app reminder to everyone who hasn't acknowledged the version that asked for it. */
+	@Transactional
+	public Map<String, Object> remind(UUID id) {
+		requireManager();
+		Map<String, Object> p = policyRow(id);
+		Map<String, Object> a = acks(id, Boolean.TRUE.equals(p.get("ackRequired")) && !Boolean.TRUE.equals(p.get("archived")));
+		if (a == null) {
+			throw new UnprocessableException(List.of(ErrorItem.field("policy", "NO_ACK", "This policy isn't asking anyone to acknowledge it")));
+		}
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> pending = (List<Map<String, Object>>) a.get("pending");
+		List<UUID> ids = pending.stream().map(m -> (UUID) m.get("id")).toList();
+		if (!ids.isEmpty()) {
+			notifier.inAppBatched(ids, "Please read and acknowledge " + p.get("name"), "Version " + a.get("version") + " needs your acknowledgement", "/me/policies?open=" + id, 60 * 12);
+			event(id, "reminder", "Reminded " + ids.size() + " " + (ids.size() == 1 ? "person" : "people") + " to acknowledge v" + a.get("version"), (String) a.get("version"));
+		}
+		return Map.of("sent", ids.size());
 	}
 
 	// ================================================================== employees
@@ -590,6 +630,10 @@ public class PolicyService {
 		out.put("id", id);
 		out.put("ackRequired", asks);
 		out.put("acknowledgedAt", at);
+		out.put("page", p.get("page"));
+		out.put("header", p.get("header"));
+		out.put("footer", p.get("footer"));
+		out.put("appliesTo", p.get("appliesTo"));
 		return out;
 	}
 
@@ -696,7 +740,7 @@ public class PolicyService {
 	private Map<String, Object> policyRow(UUID id) {
 		return jdbc.sql("""
 				select p.id, p.name, c.id, c.name, c.color_hex, p.owner_id, o.display_name, p.approver_id, a.display_name, p.review_cycle_months,
-				       p.ack_required, p.last_reviewed_on, p.archived_at, p.created_at
+				       p.ack_required, p.last_reviewed_on, p.archived_at, p.created_at, p.page::text, p.header_html, p.footer_html, p.applies_to
 				from policy p join policy_category c on c.id = p.category_id left join employee o on o.id = p.owner_id left join employee a on a.id = p.approver_id
 				where p.id = :id and p.org_id = :org""").param("id", id).param("org", org()).query((rs, i) -> {
 			Map<String, Object> m = new LinkedHashMap<>();
@@ -714,8 +758,47 @@ public class PolicyService {
 			m.put("lastReviewedOn", rs.getObject(12, LocalDate.class));
 			m.put("archived", rs.getObject(13, OffsetDateTime.class) != null);
 			m.put("createdAt", rs.getObject(14, OffsetDateTime.class));
+			m.put("page", page(rs.getString(15)));
+			m.put("header", rs.getString(16));
+			m.put("footer", rs.getString(17));
+			m.put("appliesTo", rs.getString(18));
 			return m;
 		}).optional().orElseThrow(() -> new NotFoundException("Policy not found"));
+	}
+
+	/** A body as PDF lines: sub-headings marked bold, list items with bullets, table rows with cells joined. */
+	private static String pdfText(String body) {
+		StringBuilder b = new StringBuilder();
+		for (PolicyHtml.Block x : PolicyHtml.blocks(body)) {
+			b.append("h".equals(x.kind()) ? "\u0001" : "").append(x.text()).append('\n');
+		}
+		return b.toString();
+	}
+
+	private static final Set<String> SIZES = Set.of("A5", "A4", "A3", "Letter", "Legal");
+	private static final Set<String> MARGINS = Set.of("Narrow", "Normal", "Wide");
+
+	/** Page layout with defaults for anything missing or unknown. */
+	private static Map<String, Object> pageOf(Map<?, ?> m) {
+		Map<String, Object> out = new LinkedHashMap<>();
+		Object size = m.get("size");
+		Object margin = m.get("margin");
+		out.put("size", size != null && SIZES.contains(size.toString()) ? size.toString() : "A4");
+		out.put("margin", margin != null && MARGINS.contains(margin.toString()) ? margin.toString() : "Normal");
+		out.put("orient", "Landscape".equals(String.valueOf(m.get("orient"))) ? "Landscape" : "Portrait");
+		out.put("logo", !Boolean.FALSE.equals(m.get("logo")));
+		out.put("wm", !Boolean.FALSE.equals(m.get("wm")));
+		return out;
+	}
+
+	private Map<String, Object> page(String js) {
+		try {
+			return pageOf(js == null ? Map.of() : json.readValue(js, new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
+			}));
+		}
+		catch (RuntimeException e) {
+			return pageOf(Map.of());
+		}
 	}
 
 	private static Map<String, Object> person(UUID id, String name) {
@@ -783,14 +866,17 @@ public class PolicyService {
 				if (h.isEmpty()) {
 					throw new UnprocessableException(List.of(ErrorItem.field("sections", "HEADING", "Every section needs a heading")));
 				}
-				if (h.length() > 120 || b.length() > 20000) {
+				if (h.length() > 120 || b.length() > 3_000_000) {
 					throw new UnprocessableException(List.of(ErrorItem.field("sections", "TOO_LONG", "A section is too long")));
 				}
-				out.add(new Section(h, b.strip()));
+				out.add(new Section(h, PolicyHtml.clean(b)));
 			}
 		}
 		if (out.isEmpty()) {
 			throw new UnprocessableException(List.of(ErrorItem.field("sections", "REQUIRED", "The policy needs at least one section")));
+		}
+		if (out.stream().mapToInt(x -> x.body().length()).sum() > 8_000_000) {
+			throw new UnprocessableException(List.of(ErrorItem.field("sections", "TOO_LONG", "The policy is too large; use smaller images")));
 		}
 		if (out.size() > 60) {
 			throw new UnprocessableException(List.of(ErrorItem.field("sections", "TOO_MANY", "Keep it to 60 sections")));
@@ -848,7 +934,7 @@ public class PolicyService {
 
 	private static List<String> sentences(String s) {
 		List<String> out = new ArrayList<>();
-		for (String x : s.split("(?<=[.!?])\\s+|\\n+")) {
+		for (String x : PolicyHtml.text(s).split("(?<=[.!?])\\s+|\\n+")) {
 			if (!x.isBlank()) {
 				out.add(x.strip());
 			}

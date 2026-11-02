@@ -40,13 +40,15 @@ final class PolicyPdf {
 					y -= 6;
 					continue;
 				}
-				for (String line : wrap(clean(para.strip()), 92)) {
+				boolean bold = para.startsWith("\u0001");
+				String txt = bold ? para.substring(1) : para;
+				for (String line : wrap(clean(txt.strip()), bold ? 86 : 92)) {
 					if (y < BOTTOM) {
 						page = new StringBuilder();
 						pages.add(page);
 						y = TOP;
 					}
-					y = line(page, line, 11, false, y);
+					y = line(page, line, 11, bold, y);
 				}
 				y -= 6;
 			}
