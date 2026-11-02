@@ -9,6 +9,9 @@ public interface Notifier {
 	/** Queues an email. {@code cc} may be null. */
 	void email(String to, String cc, String subject, String html);
 
+	/** Queues an email with one file attached; {@code attachmentKey} is a key in the file store. */
+	void email(String to, String cc, String subject, String html, String attachmentKey, String attachmentName);
+
 	/** Sends an SMS. The text may hold a secret, so it is never stored or logged. */
 	void sms(String phone, String text);
 

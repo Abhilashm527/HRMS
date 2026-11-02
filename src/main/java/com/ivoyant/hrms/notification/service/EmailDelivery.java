@@ -1,6 +1,8 @@
 package com.ivoyant.hrms.notification.service;
 
+import com.ivoyant.hrms.common.storage.FileStore;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -25,10 +27,12 @@ class EmailDelivery {
 	private final ObjectProvider<JavaMailSender> sender;
 	private final String from;
 	private final String host;
+	private final FileStore files;
 
-	EmailDelivery(JdbcClient jdbc, ObjectProvider<JavaMailSender> sender, @Value("${hrms.mail-from:HRMS <no-reply@ivoyant.com>}") String from,
+	EmailDelivery(JdbcClient jdbc, ObjectProvider<JavaMailSender> sender, FileStore files, @Value("${hrms.mail-from:HRMS <no-reply@ivoyant.com>}") String from,
 			@Value("${spring.mail.host:}") String host) {
 		this.host = host;
+		this.files = files;
 		this.jdbc = jdbc;
 		this.sender = sender;
 		this.from = from;
@@ -41,19 +45,22 @@ class EmailDelivery {
 		if (mail == null || host == null || host.isBlank()) {
 			return;
 		}
-		for (var row : jdbc.sql("select id, to_address, cc_address, subject, html from notification_email where sent_at is null and error is null order by id limit 20 for update skip locked")
-				.query((rs, i) -> new Object[] {rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)}).list()) {
+		for (var row : jdbc.sql("select id, to_address, cc_address, subject, html, attachment_key, attachment_name from notification_email where sent_at is null and error is null order by id limit 20 for update skip locked")
+				.query((rs, i) -> new Object[] {rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7)}).list()) {
 			long id = (Long) row[0];
 			try {
 				MimeMessage message = mail.createMimeMessage();
-				MimeMessageHelper h = new MimeMessageHelper(message, "UTF-8");
+				MimeMessageHelper h = new MimeMessageHelper(message, row[5] != null, "UTF-8");
 				h.setFrom(from);
-				h.setTo((String) row[1]);
+				h.setTo(((String) row[1]).split("\\s*,\\s*"));
 				if (row[2] != null && !((String) row[2]).isBlank()) {
 					h.setCc((String) row[2]);
 				}
 				h.setSubject((String) row[3]);
 				h.setText((String) row[4], true);
+				if (row[5] != null) {
+					h.addAttachment((String) row[6], new ByteArrayResource(files.get((String) row[5])));
+				}
 				mail.send(message);
 				jdbc.sql("update notification_email set sent_at = now() where id = :id").param("id", id).update();
 			}

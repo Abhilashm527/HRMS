@@ -37,6 +37,18 @@ class NotificationService implements Notifier {
 	}
 
 	@Override
+	@Transactional
+	public void email(String to, String cc, String subject, String html, String attachmentKey, String attachmentName) {
+		if (to == null || to.isBlank()) {
+			return;
+		}
+		jdbc.sql("insert into notification_email (org_id, to_address, cc_address, subject, html, attachment_key, attachment_name) values (:org, :to, :cc, :s, :h, :ak, :an)")
+				.param("org", currentUser.orgId()).param("to", to).param("cc", cc).param("s", subject).param("h", html).param("ak", attachmentKey)
+				.param("an", attachmentName).update();
+		log.info("email with {} queued to {} — {}", attachmentName, to, subject);
+	}
+
+	@Override
 	public void sms(String phone, String text) {
 		// no SMS gateway is wired yet; only the fact is logged, never the text (it can carry a temporary password)
 		log.info("sms to {} ({} characters)", phone, text == null ? 0 : text.length());
