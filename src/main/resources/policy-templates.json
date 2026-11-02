@@ -1,0 +1,198 @@
+[
+ {
+  "key": "leave-policy",
+  "name": "Leave policy",
+  "category": "Time off",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Purpose",
+    "body": "This policy sets out how employees request and take paid time off. It applies to all full-time and part-time employees on Ivoyant payroll."
+   },
+   {
+    "heading": "Entitlement",
+    "body": "Employees receive 18 days of earned leave per calendar year. Earned leave accrues monthly at 1.5 days. Employees also receive 8 days of casual leave and 6 days of sick leave."
+   },
+   {
+    "heading": "Requesting leave",
+    "body": "Leave must be requested in the HRMS at least 7 days in advance. Requests are approved by the reporting manager. Sick leave can be applied on return to work."
+   },
+   {
+    "heading": "Carry forward",
+    "body": "Up to 10 days of unused earned leave carry forward to the next year. Casual and sick leave lapse at year end."
+   }
+  ]
+ },
+ {
+  "key": "remote-hybrid-work",
+  "name": "Remote & hybrid work",
+  "category": "Workplace",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Scope",
+    "body": "This policy covers employees working from locations other than an Ivoyant office. It does not change employment terms or compensation."
+   },
+   {
+    "heading": "Eligibility",
+    "body": "Employees who have completed probation may work remotely up to 2 days a week. Roles that require on-site presence are excluded."
+   },
+   {
+    "heading": "Working hours",
+    "body": "Remote employees must be reachable during core hours of 11:00 to 16:00 IST. Calendars must reflect working location."
+   },
+   {
+    "heading": "Equipment",
+    "body": "Ivoyant provides a laptop and headset. Employees are responsible for a reliable internet connection."
+   }
+  ]
+ },
+ {
+  "key": "code-of-conduct",
+  "name": "Code of conduct",
+  "category": "Conduct",
+  "cycle": 24,
+  "sections": [
+   {
+    "heading": "Principles",
+    "body": "Employees act with integrity, respect and fairness in all dealings. Everyone is responsible for raising concerns early."
+   },
+   {
+    "heading": "Conflicts of interest",
+    "body": "Employees must disclose any outside business interest that may conflict with their role. Disclosures are reviewed by People and Legal."
+   },
+   {
+    "heading": "Gifts",
+    "body": "Gifts above ₹5,000 in value must be declared. Cash gifts must never be accepted."
+   },
+   {
+    "heading": "Reporting concerns",
+    "body": "Concerns can be raised with a manager, HR or the ethics inbox. Retaliation against anyone raising a concern is prohibited."
+   }
+  ]
+ },
+ {
+  "key": "information-security",
+  "name": "Information security",
+  "category": "Security",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Access",
+    "body": "Access to systems is granted on a least-privilege basis. Access is reviewed every 6 months by system owners."
+   },
+   {
+    "heading": "Passwords",
+    "body": "Passwords must be at least 12 characters. Multi-factor authentication is required for email and code repositories."
+   },
+   {
+    "heading": "Devices",
+    "body": "Company laptops must use full-disk encryption. Screens must lock after 10 minutes of inactivity."
+   },
+   {
+    "heading": "Incidents",
+    "body": "Suspected incidents must be reported to the security channel within 1 hour."
+   }
+  ]
+ },
+ {
+  "key": "travel-expense",
+  "name": "Travel & expense",
+  "category": "Finance",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Approval",
+    "body": "Business travel must be approved by the reporting manager before booking. International travel also needs approval from the department head."
+   },
+   {
+    "heading": "Bookings",
+    "body": "Flights and hotels are booked through the travel desk. Economy class is used for flights under 6 hours."
+   },
+   {
+    "heading": "Allowances",
+    "body": "A daily allowance of ₹2,500 covers meals within India. Receipts are required for all expenses above ₹500."
+   },
+   {
+    "heading": "Claims",
+    "body": "Expense claims must be submitted within 30 days of travel. Approved claims are reimbursed with the next payroll."
+   }
+  ]
+ },
+ {
+  "key": "prevention-of-sexual-harassment",
+  "name": "Prevention of sexual harassment",
+  "category": "Compliance",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Commitment",
+    "body": "Ivoyant is committed to a workplace free from sexual harassment. This policy follows the POSH Act, 2013."
+   },
+   {
+    "heading": "Internal committee",
+    "body": "An Internal Committee handles complaints. The committee is chaired by a senior woman employee and includes an external member."
+   },
+   {
+    "heading": "Complaints",
+    "body": "Complaints can be filed within 3 months of an incident. Inquiries are completed within 90 days."
+   },
+   {
+    "heading": "Training",
+    "body": "All employees complete awareness training every year."
+   }
+  ]
+ },
+ {
+  "key": "asset-usage",
+  "name": "Asset usage",
+  "category": "Workplace",
+  "cycle": 24,
+  "sections": [
+   {
+    "heading": "Issue",
+    "body": "Assets are issued on joining and recorded against the employee in the HRMS."
+   },
+   {
+    "heading": "Care",
+    "body": "Employees must keep assets secure and report loss or damage within 24 hours."
+   },
+   {
+    "heading": "Return",
+    "body": "Assets must be returned on the last working day. Unreturned assets are recovered from the final settlement."
+   }
+  ]
+ },
+ {
+  "key": "parental-leave",
+  "name": "Parental leave",
+  "category": "Time off",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Maternity",
+    "body": "Birthing parents receive 26 weeks of paid leave."
+   },
+   {
+    "heading": "Paternity",
+    "body": "Non-birthing parents receive 4 weeks of paid leave, taken within 6 months of the birth or adoption."
+   },
+   {
+    "heading": "Adoption",
+    "body": "Adoptive parents receive the same leave as birthing or non-birthing parents."
+   }
+  ]
+ },
+ {
+  "key": "dress-code",
+  "name": "Dress code",
+  "category": "Workplace",
+  "cycle": 12,
+  "sections": [
+   {
+    "heading": "Guidance",
+    "body": "Employees dress in business casual at the office. Client visits require formal attire."
+   }
+  ]
+ }
+]
