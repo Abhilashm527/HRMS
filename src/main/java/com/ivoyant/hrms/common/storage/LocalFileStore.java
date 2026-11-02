@@ -3,15 +3,13 @@ package com.ivoyant.hrms.common.storage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
-@Component
+/** Files on the local disk: only read now, for anything saved before files moved into the database. */
 class LocalFileStore implements FileStore {
 
 	private final Path root;
 
-	LocalFileStore(@Value("${hrms.onboarding.storage-dir:./data/onboarding}") String dir) {
+	LocalFileStore(String dir) {
 		this.root = Path.of(dir).toAbsolutePath().normalize();
 	}
 
