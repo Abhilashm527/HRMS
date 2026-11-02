@@ -544,6 +544,17 @@ public class PolicyService {
 		return new FileContent(bytes, "application/pdf", file.isBlank() ? "policy.pdf" : file);
 	}
 
+	/** Reads an uploaded PDF or Word file into sections for the editor. Nothing is saved. */
+	public Map<String, Object> importFile(String fileName, byte[] bytes) {
+		requireManager();
+		PolicyImport.Result r = PolicyImport.read(fileName, bytes);
+		Map<String, Object> out = new LinkedHashMap<>();
+		out.put("title", r.title());
+		out.put("pages", r.pages());
+		out.put("sections", r.sections());
+		return out;
+	}
+
 	/** Sends an in-app reminder to everyone who hasn't acknowledged the version that asked for it. */
 	@Transactional
 	public Map<String, Object> remind(UUID id) {

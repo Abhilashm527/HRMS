@@ -154,7 +154,7 @@ final class PolicyHtml {
 				case "ul", "ol" -> {
 					int i = e.normalName().equals("ol") ? parseInt(e.attr("start"), 1) : 0;
 					for (Element li : e.children()) {
-						add(out, "li", (i > 0 ? (i++) + ". " : "• ") + li.text());
+						add(out, "li", (i > 0 ? (i++) + ". " : "- ") + li.text());
 					}
 				}
 				case "table" -> {

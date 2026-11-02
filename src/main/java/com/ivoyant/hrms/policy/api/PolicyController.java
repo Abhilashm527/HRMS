@@ -164,6 +164,12 @@ public class PolicyController {
 		return policies.read(id);
 	}
 
+	/** Multipart {@code file}: a PDF or .docx read into sections (title, sections, pages); nothing is saved. */
+	@PostMapping(path = "/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+	public Map<String, Object> importFile(@org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+		return policies.importFile(file.getOriginalFilename(), file.getBytes());
+	}
+
 	/** Reminds everyone who hasn't acknowledged the current version yet. */
 	@PostMapping("/{id}/remind")
 	public Map<String, Object> remind(@PathVariable UUID id) {
